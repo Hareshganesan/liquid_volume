@@ -22,7 +22,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
-import android.view.animation.OvershootInterpolator
+import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -30,6 +30,7 @@ import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.DrawableCompat
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @SuppressLint("ViewConstructor")
 class MasterVolumeOverlayView(
@@ -46,6 +47,10 @@ class MasterVolumeOverlayView(
 
     var isExpanded = false
         private set
+
+    // Fluid Animation Curves
+    private val appleSpringInterpolator = PathInterpolator(0.22f, 1f, 0.36f, 1f)
+    private val appleSmoothDecelerate = DecelerateInterpolator(1.8f)
 
     // Containers
     private val backdropDim = View(context)
@@ -87,7 +92,8 @@ class MasterVolumeOverlayView(
 
     private fun setupBackdrop() {
         backdropDim.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-        backdropDim.setBackgroundColor(Color.parseColor("#73000000")) // 45% rich dark glass scrim
+        // Subtle 28% frosted backdrop dim to let hardware blur glow through
+        backdropDim.setBackgroundColor(Color.parseColor("#47000000"))
         backdropDim.visibility = View.GONE
         backdropDim.setOnClickListener {
             onInteraction()
@@ -100,16 +106,16 @@ class MasterVolumeOverlayView(
         val width = dpToPx(prefs.sliderWidthDp)
         val height = dpToPx(prefs.sliderHeightDp)
 
-        val containerParams = LayoutParams(width + dpToPx(20), height + dpToPx(46)).apply {
+        val containerParams = LayoutParams(width + dpToPx(24), height + dpToPx(50)).apply {
             gravity = if (prefs.isRightSide) Gravity.END or Gravity.CENTER_VERTICAL else Gravity.START or Gravity.CENTER_VERTICAL
         }
         compactRoot.layoutParams = containerParams
 
         // 3-Dots Expand Button (Apple Frosted Glass Orb)
-        val dotSize = dpToPx(32)
+        val dotSize = dpToPx(34)
         val dotParams = LayoutParams(dotSize, dotSize).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            topMargin = dpToPx(2)
+            topMargin = dpToPx(3)
         }
         btnExpandDots.layoutParams = dotParams
         btnExpandDots.setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_more_horiz))
@@ -117,11 +123,11 @@ class MasterVolumeOverlayView(
 
         val dotBg = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
-            setColor(Color.parseColor("#441E293B"))
-            setStroke(dpToPx(1), Color.parseColor("#45FFFFFF"))
+            setColor(Color.parseColor("#38FFFFFF")) // Translucent frosted orb
+            setStroke(dpToPx(1.2f), Color.parseColor("#55FFFFFF"))
         }
         btnExpandDots.background = dotBg
-        btnExpandDots.setPadding(dpToPx(6), dpToPx(6), dpToPx(6), dpToPx(6))
+        btnExpandDots.setPadding(dpToPx(7), dpToPx(7), dpToPx(7), dpToPx(7))
         btnExpandDots.setOnClickListener {
             vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
             onInteraction()
@@ -146,15 +152,16 @@ class MasterVolumeOverlayView(
         masterCard.orientation = LinearLayout.VERTICAL
         masterCard.setPadding(dpToPx(26), dpToPx(24), dpToPx(26), dpToPx(24))
 
-        // Master Card Apple Glass Styling
+        // True Liquid Frosted Glass (Translucent, NO dark blue tint!)
         val cardBg = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = dpToPx(36).toFloat()
-            setColor(Color.parseColor("#F00E1424")) // Opaque Obsidian Frosted Glass
-            setStroke(dpToPx(1.2f), Color.parseColor("#48FFFFFF")) // Glowing Specular Rim
+            // 28% Translucent Neutral Frosted Tint - Allows hardware blur behind it to shine through brilliantly!
+            setColor(Color.parseColor("#3B181A24"))
+            setStroke(dpToPx(1.3f), Color.parseColor("#55FFFFFF")) // Crisp specular rim
         }
         masterCard.background = cardBg
-        masterCard.elevation = dpToPx(20).toFloat()
+        masterCard.elevation = dpToPx(24).toFloat()
 
         // 1. Header (Badge + Title + Close Button)
         val header = LinearLayout(context).apply {
@@ -163,7 +170,7 @@ class MasterVolumeOverlayView(
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         }
 
-        // Audio Icon Badge
+        // Audio Icon Frosted Badge
         val iconBadge = ImageView(context).apply {
             layoutParams = LinearLayout.LayoutParams(dpToPx(38), dpToPx(38)).apply {
                 marginEnd = dpToPx(12)
@@ -172,8 +179,8 @@ class MasterVolumeOverlayView(
             setColorFilter(Color.parseColor(prefs.accentColorHex))
             val badgeBg = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#25FFFFFF"))
-                setStroke(dpToPx(1), Color.parseColor("#35FFFFFF"))
+                setColor(Color.parseColor("#26FFFFFF"))
+                setStroke(dpToPx(1), Color.parseColor("#40FFFFFF"))
             }
             background = badgeBg
             setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
@@ -187,27 +194,27 @@ class MasterVolumeOverlayView(
         val tvTitle = TextView(context).apply {
             text = "Audio Control Center"
             setTextColor(Color.WHITE)
-            textSize = 18f
+            textSize = 18.5f
             typeface = Typeface.DEFAULT_BOLD
             letterSpacing = -0.01f
         }
         val tvSub = TextView(context).apply {
             text = "ColorOS 16 · iOS 18 Liquid Glass"
-            setTextColor(Color.parseColor("#94A3B8"))
+            setTextColor(Color.parseColor("#CBD5E1"))
             textSize = 12f
         }
         titleCol.addView(tvTitle)
         titleCol.addView(tvSub)
 
-        // Close Button
+        // Apple Style Circular Close Button
         val btnClose = ImageView(context).apply {
             layoutParams = LinearLayout.LayoutParams(dpToPx(32), dpToPx(32))
             setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_close))
             setColorFilter(Color.WHITE)
             val closeBg = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#30FFFFFF"))
-                setStroke(dpToPx(1), Color.parseColor("#30FFFFFF"))
+                setColor(Color.parseColor("#2EFFFFFF"))
+                setStroke(dpToPx(1), Color.parseColor("#40FFFFFF"))
             }
             background = closeBg
             setPadding(dpToPx(7), dpToPx(7), dpToPx(7), dpToPx(7))
@@ -223,7 +230,7 @@ class MasterVolumeOverlayView(
         header.addView(btnClose)
         masterCard.addView(header)
 
-        // 2. Output Device Indicator Pill
+        // 2. Output Device Indicator Pill (Translucent Glass)
         val deviceBanner = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -233,8 +240,8 @@ class MasterVolumeOverlayView(
             val bannerBg = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = dpToPx(12).toFloat()
-                setColor(Color.parseColor("#22FFFFFF"))
-                setStroke(dpToPx(1), Color.parseColor("#18FFFFFF"))
+                setColor(Color.parseColor("#20FFFFFF"))
+                setStroke(dpToPx(1), Color.parseColor("#25FFFFFF"))
             }
             background = bannerBg
             setPadding(dpToPx(10), dpToPx(4), dpToPx(10), dpToPx(4))
@@ -245,12 +252,12 @@ class MasterVolumeOverlayView(
                 marginEnd = dpToPx(8)
             }
             setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_output_speaker))
-            setColorFilter(Color.parseColor("#38BDF8")) // Vivid sky blue
+            setColorFilter(Color.parseColor("#38BDF8"))
         }
 
         tvOutputDevice.apply {
             text = getActiveOutputDeviceText()
-            setTextColor(Color.parseColor("#E2E8F0"))
+            setTextColor(Color.parseColor("#F1F5F9"))
             textSize = 12.5f
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
@@ -260,7 +267,7 @@ class MasterVolumeOverlayView(
             layoutParams = LinearLayout.LayoutParams(dpToPx(6), dpToPx(6))
             val dotBg = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#22C55E")) // Green online dot
+                setColor(Color.parseColor("#22C55E"))
             }
             background = dotBg
         }
@@ -302,8 +309,8 @@ class MasterVolumeOverlayView(
             // Floating Percentage Text above Slider
             val tvPercent = TextView(context).apply {
                 text = "0%"
-                setTextColor(Color.parseColor("#94A3B8"))
-                textSize = 11.5f
+                setTextColor(Color.parseColor("#CBD5E1"))
+                textSize = 12f
                 typeface = Typeface.DEFAULT_BOLD
                 setPadding(0, 0, 0, dpToPx(6))
             }
@@ -322,7 +329,7 @@ class MasterVolumeOverlayView(
                 isMasterMode = true,
                 onVolumeChanged = { percent ->
                     tvPercent.text = if (percent == 0) "Muted" else "$percent%"
-                    tvPercent.setTextColor(if (percent == 0) Color.parseColor("#F87171") else Color.parseColor("#CBD5E1"))
+                    tvPercent.setTextColor(if (percent == 0) Color.parseColor("#F87171") else Color.parseColor("#F1F5F9"))
                 }
             ).apply {
                 layoutParams = LinearLayout.LayoutParams(dpToPx(54), dpToPx(165))
@@ -332,7 +339,7 @@ class MasterVolumeOverlayView(
             // Label underneath
             val tvLabel = TextView(context).apply {
                 text = label
-                setTextColor(Color.parseColor("#F1F5F9"))
+                setTextColor(Color.parseColor("#F8FAFC"))
                 textSize = 12f
                 typeface = Typeface.DEFAULT_BOLD
                 setPadding(0, dpToPx(8), 0, 0)
@@ -383,8 +390,8 @@ class MasterVolumeOverlayView(
         val barBg = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = dpToPx(16).toFloat()
-            setColor(Color.parseColor("#22121B2A"))
-            setStroke(dpToPx(1), Color.parseColor("#22FFFFFF"))
+            setColor(Color.parseColor("#20FFFFFF")) // Translucent frosted glass bar
+            setStroke(dpToPx(1), Color.parseColor("#25FFFFFF"))
         }
         soundModeSegmented.background = barBg
         soundModeSegmented.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
@@ -409,8 +416,8 @@ class MasterVolumeOverlayView(
                         shape = GradientDrawable.RECTANGLE
                         cornerRadius = dpToPx(12).toFloat()
                         val activeColor = when (mode) {
-                            AudioManager.RINGER_MODE_SILENT -> Color.parseColor("#EF4444") // Coral Red
-                            AudioManager.RINGER_MODE_VIBRATE -> Color.parseColor("#F59E0B") // Amber
+                            AudioManager.RINGER_MODE_SILENT -> Color.parseColor("#EF4444")
+                            AudioManager.RINGER_MODE_VIBRATE -> Color.parseColor("#F59E0B")
                             else -> Color.parseColor(prefs.accentColorHex)
                         }
                         setColor(activeColor)
@@ -462,20 +469,22 @@ class MasterVolumeOverlayView(
         isExpanded = true
         compactRoot.visibility = View.GONE
         backdropDim.visibility = View.VISIBLE
-        masterCard.visibility = View.VISIBLE
+        backdropDim.alpha = 0f
+        backdropDim.animate().alpha(1f).setDuration(260).start()
 
+        masterCard.visibility = View.VISIBLE
         tvOutputDevice.text = getActiveOutputDeviceText()
 
-        masterCard.scaleX = 0.82f
-        masterCard.scaleY = 0.82f
+        masterCard.scaleX = 0.80f
+        masterCard.scaleY = 0.80f
         masterCard.alpha = 0f
 
         masterCard.animate()
             .scaleX(1f)
             .scaleY(1f)
             .alpha(1f)
-            .setDuration(240)
-            .setInterpolator(OvershootInterpolator(1.2f))
+            .setDuration(280)
+            .setInterpolator(appleSpringInterpolator)
             .start()
 
         refreshAll()
@@ -483,20 +492,41 @@ class MasterVolumeOverlayView(
 
     fun collapseToCompactView(onCollapsed: (() -> Unit)? = null) {
         isExpanded = false
-        backdropDim.visibility = View.GONE
+        backdropDim.animate().alpha(0f).setDuration(200).start()
+
         masterCard.animate()
-            .scaleX(0.85f)
-            .scaleY(0.85f)
+            .scaleX(0.82f)
+            .scaleY(0.82f)
             .alpha(0f)
-            .setDuration(160)
-            .setInterpolator(DecelerateInterpolator())
+            .setDuration(200)
+            .setInterpolator(appleSmoothDecelerate)
             .withEndAction {
+                backdropDim.visibility = View.GONE
                 masterCard.visibility = View.GONE
                 compactRoot.visibility = View.VISIBLE
+                compactRoot.alpha = 0f
+                compactRoot.scaleX = 0.88f
+                compactRoot.scaleY = 0.88f
+                compactRoot.animate()
+                    .alpha(1f)
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(190)
+                    .setInterpolator(appleSpringInterpolator)
+                    .start()
                 compactSlider.refreshVolume()
                 onCollapsed?.invoke()
             }
             .start()
+    }
+
+    fun updateActiveStream() {
+        val activeStream = when {
+            audioManager.mode == AudioManager.MODE_IN_CALL || audioManager.mode == AudioManager.MODE_IN_COMMUNICATION -> AudioManager.STREAM_VOICE_CALL
+            audioManager.isMusicActive -> AudioManager.STREAM_MUSIC
+            else -> AudioManager.STREAM_MUSIC
+        }
+        compactSlider.updateStreamType(activeStream)
     }
 
     fun handleHardwareKeyStep(direction: Int) {
@@ -528,20 +558,19 @@ class MasterVolumeOverlayView(
 }
 
 /**
- * Ultra-Polished iOS 18 / ColorOS 16 Fluid Glass Slider
- * Key Highlights:
- * 1. True Apple Two-Tone Split Inversion (cleanly slices across icon and text as fluid rises)
- * 2. Specular Liquid Meniscus Crest Line
- * 3. Gradient Glass Capsule with Specular Rim Lighting
- * 4. Elastic Liquid Expansion (+10dp) with Spring Physics
- * 5. Tap-to-Mute / Restore with Tactile Haptics
- * 6. Swipe-to-Dismiss on Compact Pill
+ * Ultra-Responsive iOS 18 Liquid Glass Slider
+ * Completely Fixed Touch Architecture:
+ * - Real-time manual dragging with audio feedback (AudioManager.FLAG_PLAY_SOUND)
+ * - Cancellation of background animators on touch so slider never fights the finger
+ * - Translucent neutral frosted glass (NO dark blue!)
+ * - Dual-pass split inversion icon & percentage text
+ * - Elastic liquid spring expansion (+10dp) without layout thrashing
  */
 @SuppressLint("ViewConstructor")
 class IOSControlSlider(
     context: Context,
     private val audioManager: AudioManager,
-    val streamType: Int,
+    var streamType: Int,
     private val prefs: PreferencesManager,
     private val onInteraction: () -> Unit,
     private val onRequestDismiss: () -> Unit,
@@ -561,13 +590,14 @@ class IOSControlSlider(
     private var currentWidth = normalWidth
     private val pillHeight = dpToPx(if (isMasterMode) 165 else prefs.sliderHeightDp).toFloat()
 
+    // Translucent Frosted Glass (Neutral, No dark blue!)
     private val glassBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
 
     private val glassBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = dpToPx(1.2f).toFloat()
+        strokeWidth = dpToPx(1.3f).toFloat()
     }
 
     private val liquidPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -577,7 +607,7 @@ class IOSControlSlider(
 
     private val meniscusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = Color.parseColor("#90FFFFFF") // Glowing specular liquid crest
+        color = Color.parseColor("#A0FFFFFF") // Luminous liquid meniscus
     }
 
     private val percentTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -591,6 +621,7 @@ class IOSControlSlider(
     private var progressAnimator: ValueAnimator? = null
     private var widthAnimator: ValueAnimator? = null
 
+    private var isDragging = false
     private var touchDownX = 0f
     private var touchDownY = 0f
     private var hasMoved = false
@@ -600,7 +631,16 @@ class IOSControlSlider(
         refreshVolume()
     }
 
+    fun updateStreamType(newStreamType: Int) {
+        if (streamType != newStreamType) {
+            streamType = newStreamType
+            refreshVolume()
+        }
+    }
+
     fun refreshVolume() {
+        if (isDragging) return // Don't interrupt active finger drag!
+
         maxVolume = audioManager.getStreamMaxVolume(streamType).coerceAtLeast(1)
         val currentVol = audioManager.getStreamVolume(streamType)
         if (currentVol > 0) {
@@ -653,11 +693,11 @@ class IOSControlSlider(
 
         pillRect.set(left, top, right, bottom)
 
-        // 1. Frosted Glass Capsule Background (Linear Gradient for depth)
+        // 1. Translucent Frosted Glass Capsule (Neutral, Clean, NO dark blue!)
         glassBgPaint.shader = LinearGradient(
             left, top, left, bottom,
-            Color.parseColor("#441B243B"),
-            Color.parseColor("#250D1322"),
+            Color.parseColor("#30FFFFFF"), // Translucent white frosted tint
+            Color.parseColor("#15FFFFFF"),
             Shader.TileMode.CLAMP
         )
         canvas.drawRoundRect(pillRect, radius, radius, glassBgPaint)
@@ -673,7 +713,7 @@ class IOSControlSlider(
         fillRect.set(left, fillTop, right, bottom)
         canvas.drawRect(fillRect, liquidPaint)
 
-        // Specular Meniscus Line (liquid wave crest)
+        // Specular Meniscus Line (real liquid wave crest)
         if (animatedProgress in 0.02f..0.98f) {
             meniscusRect.set(left, fillTop, right, fillTop + dpToPx(2.5f))
             canvas.drawRect(meniscusRect, meniscusPaint)
@@ -681,13 +721,13 @@ class IOSControlSlider(
 
         canvas.restore()
 
-        // 3. Specular Rim / Glowing Stroke (Simulates light catching edge of glass)
+        // 3. Specular Rim / Glowing Stroke
         glassBorderPaint.shader = LinearGradient(
             left, top, left, bottom,
             intArrayOf(
-                Color.parseColor("#7AFFFFFF"), // Crisp top highlight
-                Color.parseColor("#30FFFFFF"),
-                Color.parseColor("#15FFFFFF")  // Subdued bottom
+                Color.parseColor("#80FFFFFF"), // Crisp top highlight
+                Color.parseColor("#35FFFFFF"),
+                Color.parseColor("#18FFFFFF")  // Subdued bottom
             ),
             floatArrayOf(0f, 0.45f, 1f),
             Shader.TileMode.CLAMP
@@ -707,7 +747,7 @@ class IOSControlSlider(
             canvas.drawText(textStr, pillRect.centerX(), textY.toFloat(), percentTextPaint)
             canvas.restore()
 
-            // Pass B: Submerged filled area (Deep Dark Contrast)
+            // Pass B: Submerged filled area (Deep Contrast)
             canvas.save()
             canvas.clipRect(left, fillTop, right, bottom)
             percentTextPaint.color = Color.parseColor("#090D16")
@@ -743,6 +783,9 @@ class IOSControlSlider(
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                parent?.requestDisallowInterceptTouchEvent(true)
+                progressAnimator?.cancel() // Cancel any ongoing auto-animation immediately
+                isDragging = true
                 touchDownX = event.x
                 touchDownY = event.y
                 hasMoved = false
@@ -751,10 +794,11 @@ class IOSControlSlider(
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
+                parent?.requestDisallowInterceptTouchEvent(true)
                 val dx = event.x - touchDownX
                 val dy = event.y - touchDownY
 
-                if (abs(dy) > dpToPx(4)) {
+                if (abs(dy) > dpToPx(3)) {
                     hasMoved = true
                 }
 
@@ -763,6 +807,7 @@ class IOSControlSlider(
                     val swipeThreshold = dpToPx(38)
                     val swipedOff = if (prefs.isRightSide) dx > swipeThreshold else dx < -swipeThreshold
                     if (swipedOff) {
+                        isDragging = false
                         animateWidth(normalWidth)
                         onRequestDismiss()
                         return true
@@ -773,9 +818,11 @@ class IOSControlSlider(
                 return true
             }
             MotionEvent.ACTION_UP -> {
+                parent?.requestDisallowInterceptTouchEvent(false)
+                isDragging = false
                 animateWidth(normalWidth)
 
-                // Check if user tapped the bottom icon region to mute/unmute
+                // Check if user simply tapped the bottom icon region to mute/unmute
                 val iconTouchArea = pillHeight * 0.35f
                 val top = (height - pillHeight) / 2f
                 val bottom = top + pillHeight
@@ -787,6 +834,8 @@ class IOSControlSlider(
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
+                parent?.requestDisallowInterceptTouchEvent(false)
+                isDragging = false
                 animateWidth(normalWidth)
                 return true
             }
@@ -798,10 +847,18 @@ class IOSControlSlider(
         val currentVol = audioManager.getStreamVolume(streamType)
         if (currentVol > 0) {
             lastNonZeroVolume = currentVol
-            audioManager.setStreamVolume(streamType, 0, 0)
+            try {
+                audioManager.setStreamVolume(streamType, 0, AudioManager.FLAG_PLAY_SOUND)
+            } catch (_: Exception) {
+                try { audioManager.setStreamVolume(streamType, 0, 0) } catch (_: Exception) {}
+            }
         } else {
             val restoreVol = if (lastNonZeroVolume > 0) lastNonZeroVolume else (maxVolume / 2).coerceAtLeast(1)
-            audioManager.setStreamVolume(streamType, restoreVol, 0)
+            try {
+                audioManager.setStreamVolume(streamType, restoreVol, AudioManager.FLAG_PLAY_SOUND)
+            } catch (_: Exception) {
+                try { audioManager.setStreamVolume(streamType, restoreVol, 0) } catch (_: Exception) {}
+            }
         }
         vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
         refreshVolume()
@@ -812,12 +869,20 @@ class IOSControlSlider(
         val bottom = top + pillHeight
         val clampedY = touchY.coerceIn(top, bottom)
 
-        val progress = 1f - ((clampedY - top) / pillHeight)
-        val newVol = (progress * maxVolume).toInt().coerceIn(0, maxVolume)
+        val progress = (1f - ((clampedY - top) / pillHeight)).coerceIn(0f, 1f)
+        maxVolume = audioManager.getStreamMaxVolume(streamType).coerceAtLeast(1)
+        val newVol = (progress * maxVolume).roundToInt().coerceIn(0, maxVolume)
 
         val currentVol = audioManager.getStreamVolume(streamType)
         if (newVol != currentVol) {
-            audioManager.setStreamVolume(streamType, newVol, 0)
+            try {
+                audioManager.setStreamVolume(streamType, newVol, AudioManager.FLAG_PLAY_SOUND)
+            } catch (e: Exception) {
+                try {
+                    audioManager.setStreamVolume(streamType, newVol, 0)
+                } catch (_: Exception) {}
+            }
+
             if (newVol > 0) {
                 lastNonZeroVolume = newVol
             }
@@ -840,8 +905,7 @@ class IOSControlSlider(
             interpolator = OvershootInterpolator(1.4f)
             addUpdateListener { va ->
                 currentWidth = va.animatedValue as Float
-                requestLayout()
-                invalidate()
+                invalidate() // Redraw smoothly with NO layout thrashing
             }
             start()
         }

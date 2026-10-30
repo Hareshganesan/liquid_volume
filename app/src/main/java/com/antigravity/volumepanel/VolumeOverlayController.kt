@@ -11,7 +11,7 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
-import android.view.animation.OvershootInterpolator
+import android.view.animation.PathInterpolator
 
 class VolumeOverlayController(private val context: Context) {
 
@@ -24,6 +24,10 @@ class VolumeOverlayController(private val context: Context) {
     private var isShowing = false
 
     private val dismissRunnable = Runnable { dismiss() }
+
+    // Apple iOS 18 fluid spring curves
+    private val appleSpringEnter = PathInterpolator(0.22f, 1f, 0.36f, 1f)
+    private val appleSmoothExit = PathInterpolator(0.4f, 0f, 0.2f, 1f)
 
     fun show(direction: Int = 0) {
         handler.removeCallbacks(dismissRunnable)
@@ -57,20 +61,28 @@ class VolumeOverlayController(private val context: Context) {
                 windowManager.addView(overlay, params)
                 isShowing = true
 
-                // Enter animation
-                val startX = if (prefs.isRightSide) 140f else -140f
-                overlay.translationX = startX
+                // Ultra-smooth Apple fluid entry animation
+                val density = context.resources.displayMetrics.density
+                val startTranslationX = if (prefs.isRightSide) 55f * density else -55f * density
+
+                overlay.translationX = startTranslationX
+                overlay.scaleX = 0.85f
+                overlay.scaleY = 0.85f
                 overlay.alpha = 0f
 
                 overlay.animate()
                     .translationX(0f)
+                    .scaleX(1f)
+                    .scaleY(1f)
                     .alpha(1f)
-                    .setDuration(220)
-                    .setInterpolator(OvershootInterpolator(1.1f))
+                    .setDuration(260)
+                    .setInterpolator(appleSpringEnter)
                     .start()
 
             } catch (_: Exception) {}
         }
+
+        overlay.updateActiveStream()
 
         if (direction != 0) {
             overlay.handleHardwareKeyStep(direction)
@@ -102,7 +114,7 @@ class VolumeOverlayController(private val context: Context) {
             x = 0
             y = 0
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val blur = prefs.blurRadius.toInt().coerceIn(15, 60)
+                val blur = prefs.blurRadius.toInt().coerceIn(25, 75)
                 setBlurBehindRadius(blur)
             }
         }
@@ -182,12 +194,16 @@ class VolumeOverlayController(private val context: Context) {
                     finishDismiss(overlay)
                 }
             } else {
-                val endX = if (prefs.isRightSide) 140f else -140f
+                val density = context.resources.displayMetrics.density
+                val endTranslationX = if (prefs.isRightSide) 50f * density else -50f * density
+
                 overlay.animate()
-                    .translationX(endX)
+                    .translationX(endTranslationX)
+                    .scaleX(0.85f)
+                    .scaleY(0.85f)
                     .alpha(0f)
-                    .setDuration(160)
-                    .setInterpolator(DecelerateInterpolator())
+                    .setDuration(210)
+                    .setInterpolator(appleSmoothExit)
                     .setListener(object : AnimatorListenerAdapter() {
                         override fun onAnimationEnd(animation: Animator) {
                             finishDismiss(overlay)
