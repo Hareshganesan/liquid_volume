@@ -5,11 +5,13 @@ import android.animation.AnimatorListenerAdapter
 import android.content.Context
 import android.graphics.PixelFormat
 import android.media.AudioManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
+import android.view.animation.OvershootInterpolator
 
 class VolumeOverlayController(private val context: Context) {
 
@@ -18,7 +20,7 @@ class VolumeOverlayController(private val context: Context) {
     private val prefs = PreferencesManager(context)
     private val handler = Handler(Looper.getMainLooper())
 
-    private var panelView: VolumePanelView? = null
+    private var sliderView: LiquidGlassSliderView? = null
     private var isShowing = false
 
     private val dismissRunnable = Runnable { dismiss() }
@@ -26,19 +28,19 @@ class VolumeOverlayController(private val context: Context) {
     fun show(direction: Int = 0) {
         handler.removeCallbacks(dismissRunnable)
 
-        if (panelView == null) {
-            panelView = VolumePanelView(
+        if (sliderView == null) {
+            sliderView = LiquidGlassSliderView(
                 context = context,
                 audioManager = audioManager,
                 prefs = prefs,
-                onUserInteracted = {
+                onInteraction = {
                     handler.removeCallbacks(dismissRunnable)
                     handler.postDelayed(dismissRunnable, AUTO_DISMISS_DELAY_MS)
                 }
             )
         }
 
-        val panel = panelView ?: return
+        val slider = sliderView ?: return
 
         if (!isShowing) {
             val gravity = if (prefs.isRightSide) {
@@ -47,44 +49,59 @@ class VolumeOverlayController(private val context: Context) {
                 Gravity.START or Gravity.CENTER_VERTICAL
             }
 
-            val margin = (16 * context.resources.displayMetrics.density).toInt()
+            var windowFlags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+
+            // Enable Native Window Blur Behind on Android 12+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                windowFlags = windowFlags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+            }
 
             val params = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                        WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+                windowFlags,
                 PixelFormat.TRANSLUCENT
             ).apply {
                 this.gravity = gravity
-                x = margin
+                x = (8 * context.resources.displayMetrics.density).toInt()
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val blur = prefs.blurRadius.toInt().coerceIn(15, 60)
+                    setBlurBehindRadius(blur)
+                }
             }
 
             try {
-                windowManager.addView(panel, params)
+                windowManager.addView(slider, params)
                 isShowing = true
 
-                // Slide-in animation
-                val translationStartX = if (prefs.isRightSide) 200f else -200f
-                panel.translationX = translationStartX
-                panel.alpha = 0f
-                panel.animate()
+                // Premium Spring Pop-in Animation
+                val startX = if (prefs.isRightSide) 120f else -120f
+                slider.translationX = startX
+                slider.scaleX = 0.85f
+                slider.scaleY = 0.85f
+                slider.alpha = 0f
+
+                slider.animate()
                     .translationX(0f)
+                    .scaleX(1f)
+                    .scaleY(1f)
                     .alpha(1f)
-                    .setDuration(180)
-                    .setInterpolator(DecelerateInterpolator())
+                    .setDuration(220)
+                    .setInterpolator(OvershootInterpolator(1.1f))
                     .start()
 
-            } catch (_: Exception) {
-                // Permission not granted or already attached
-            }
+            } catch (_: Exception) {}
         }
 
-        panel.refreshVolumeState()
+        slider.updateAccentColor()
+        slider.refreshVolume()
+
         if (direction != 0) {
-            panel.adjustVolumeByStep(direction)
+            slider.adjustVolumeByStep(direction)
         }
 
         handler.postDelayed(dismissRunnable, AUTO_DISMISS_DELAY_MS)
@@ -92,23 +109,26 @@ class VolumeOverlayController(private val context: Context) {
 
     fun dismiss() {
         handler.removeCallbacks(dismissRunnable)
-        val panel = panelView ?: return
+        val slider = sliderView ?: return
 
         if (isShowing) {
-            val translationEndX = if (prefs.isRightSide) 200f else -200f
-            panel.animate()
-                .translationX(translationEndX)
+            val endX = if (prefs.isRightSide) 120f else -120f
+            slider.animate()
+                .translationX(endX)
+                .scaleX(0.85f)
+                .scaleY(0.85f)
                 .alpha(0f)
                 .setDuration(160)
+                .setInterpolator(DecelerateInterpolator())
                 .setListener(object : AnimatorListenerAdapter() {
                     override fun onAnimationEnd(animation: Animator) {
                         try {
                             if (isShowing) {
-                                windowManager.removeView(panel)
+                                windowManager.removeView(slider)
                                 isShowing = false
                             }
                         } catch (_: Exception) {}
-                        panel.animate().setListener(null)
+                        slider.animate().setListener(null)
                     }
                 })
                 .start()
