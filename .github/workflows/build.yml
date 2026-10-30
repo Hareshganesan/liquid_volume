@@ -5,6 +5,9 @@ on:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -43,3 +46,21 @@ jobs:
       with:
         name: LiquidVolume-Debug-APK
         path: app/build/outputs/apk/debug/app-debug.apk
+
+    - name: Create or Update Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: latest
+        name: "Liquid Volume Latest Build"
+        body: |
+          ### Liquid Volume - iOS 18 & ColorOS 16 Ultra Fluid Volume Center
+          - Full-screen centered Master Audio Control Center
+          - 4 independent stream sliders (Media, Ringtone, Alerts, Alarm)
+          - 3-mode segmented sound bar (Silent, Vibrate, Ring)
+          - Tap speaker icon to instant mute/restore
+          - Swipe-off edge gesture to dismiss compact slider
+          - Hardware GPU Gaussian blur (FLAG_BLUR_BEHIND / setBlurBehindRadius)
+          - Full customization in app (Position, Length, Thickness, Timeout, Accent Color)
+        files: app/build/outputs/apk/debug/app-debug.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

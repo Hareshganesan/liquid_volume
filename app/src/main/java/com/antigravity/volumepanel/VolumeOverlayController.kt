@@ -36,6 +36,12 @@ class VolumeOverlayController(private val context: Context) {
                 onInteraction = {
                     resetDismissTimer()
                 },
+                onRequestExpand = {
+                    expandToMaster()
+                },
+                onRequestCollapse = {
+                    collapseToCompact()
+                },
                 onRequestDismiss = {
                     dismiss()
                 }
@@ -72,6 +78,51 @@ class VolumeOverlayController(private val context: Context) {
             overlay.refreshAll()
         }
 
+        resetDismissTimer()
+    }
+
+    private fun expandToMaster() {
+        val overlay = overlayView ?: return
+
+        var windowFlags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            windowFlags = windowFlags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+        }
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            windowFlags,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.CENTER
+            x = 0
+            y = 0
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val blur = prefs.blurRadius.toInt().coerceIn(15, 60)
+                setBlurBehindRadius(blur)
+            }
+        }
+
+        try {
+            windowManager.updateViewLayout(overlay, params)
+        } catch (_: Exception) {}
+
+        overlay.expandToMasterView()
+        resetDismissTimer()
+    }
+
+    private fun collapseToCompact() {
+        val overlay = overlayView ?: return
+        overlay.collapseToCompactView {
+            val params = createCompactLayoutParams()
+            try {
+                windowManager.updateViewLayout(overlay, params)
+            } catch (_: Exception) {}
+        }
         resetDismissTimer()
     }
 
@@ -117,7 +168,6 @@ class VolumeOverlayController(private val context: Context) {
 
     private fun resetDismissTimer() {
         handler.removeCallbacks(dismissRunnable)
-        // If user is inside Master mode, give them longer (6s) to adjust streams
         val delay = if (overlayView?.isExpanded == true) 6000L else prefs.timeoutMs
         handler.postDelayed(dismissRunnable, delay)
     }
@@ -127,24 +177,35 @@ class VolumeOverlayController(private val context: Context) {
         val overlay = overlayView ?: return
 
         if (isShowing) {
-            val endX = if (prefs.isRightSide) 140f else -140f
-            overlay.animate()
-                .translationX(endX)
-                .alpha(0f)
-                .setDuration(160)
-                .setInterpolator(DecelerateInterpolator())
-                .setListener(object : AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animation: Animator) {
-                        try {
-                            if (isShowing) {
-                                windowManager.removeView(overlay)
-                                isShowing = false
-                            }
-                        } catch (_: Exception) {}
-                        overlay.animate().setListener(null)
-                    }
-                })
-                .start()
+            if (overlay.isExpanded) {
+                overlay.collapseToCompactView {
+                    finishDismiss(overlay)
+                }
+            } else {
+                val endX = if (prefs.isRightSide) 140f else -140f
+                overlay.animate()
+                    .translationX(endX)
+                    .alpha(0f)
+                    .setDuration(160)
+                    .setInterpolator(DecelerateInterpolator())
+                    .setListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator) {
+                            finishDismiss(overlay)
+                            overlay.animate().setListener(null)
+                        }
+                    })
+                    .start()
+            }
         }
+    }
+
+    private fun finishDismiss(overlay: MasterVolumeOverlayView) {
+        try {
+            if (isShowing) {
+                windowManager.removeView(overlay)
+                isShowing = false
+            }
+        } catch (_: Exception) {}
+        overlayView = null
     }
 }
