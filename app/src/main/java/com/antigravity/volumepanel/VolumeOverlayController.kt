@@ -2,7 +2,10 @@ package com.antigravity.volumepanel
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.PixelFormat
 import android.media.AudioManager
 import android.os.Build
@@ -10,9 +13,18 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
 import android.view.WindowManager
-import android.view.animation.DecelerateInterpolator
-import android.view.animation.PathInterpolator
 
+/**
+ * Production-Quality WindowManager & Lifecycle Orchestrator
+ *
+ * Responsibilities:
+ * - Formal OverlayState machine to prevent transition collisions and stale views.
+ * - Dynamic WindowManager layout re-targeting (Compact Edge ➔ Master Center Modal).
+ * - System Volume BroadcastReceiver (android.media.VOLUME_CHANGED_ACTION) for real-time external synchronization.
+ * - Focus arbitration (Pass-through focus in Compact; Back-button capture in Master).
+ * - True hardware blur support (FLAG_BLUR_BEHIND) with graceful fallback.
+ * - Apple fluid spring animations for entrance, collapse, and dismissal.
+ */
 class VolumeOverlayController(private val context: Context) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -21,13 +33,24 @@ class VolumeOverlayController(private val context: Context) {
     private val handler = Handler(Looper.getMainLooper())
 
     private var overlayView: MasterVolumeOverlayView? = null
-    private var isShowing = false
+    var currentState: OverlayState = OverlayState.Hidden
+        private set
 
     private val dismissRunnable = Runnable { dismiss() }
 
-    // Apple iOS 18 fluid spring curves
-    private val appleSpringEnter = PathInterpolator(0.22f, 1f, 0.36f, 1f)
-    private val appleSmoothExit = PathInterpolator(0.4f, 0f, 0.2f, 1f)
+    // External System Volume Broadcast Receiver
+    private var isReceiverRegistered = false
+    private val volumeChangeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context?, intent: Intent?) {
+            if (intent?.action == "android.media.VOLUME_CHANGED_ACTION") {
+                val streamType = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", -1)
+                val streamValue = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_VALUE", -1)
+                if (streamType != -1 && streamValue != -1) {
+                    overlayView?.onExternalVolumeChange(streamType, streamValue)
+                }
+            }
+        }
+    }
 
     fun show(direction: Int = 0) {
         handler.removeCallbacks(dismissRunnable)
@@ -37,7 +60,12 @@ class VolumeOverlayController(private val context: Context) {
                 context = context,
                 audioManager = audioManager,
                 prefs = prefs,
-                onInteraction = {
+                onInteractionStart = {
+                    transitionTo(if (overlayView?.isExpanded == true) OverlayState.MasterInteracting else OverlayState.CompactInteracting)
+                    handler.removeCallbacks(dismissRunnable)
+                },
+                onInteractionEnd = {
+                    transitionTo(if (overlayView?.isExpanded == true) OverlayState.MasterVisible else OverlayState.CompactVisible)
                     resetDismissTimer()
                 },
                 onRequestExpand = {
@@ -54,14 +82,15 @@ class VolumeOverlayController(private val context: Context) {
 
         val overlay = overlayView ?: return
 
-        if (!isShowing) {
+        if (!currentState.isVisible) {
+            registerVolumeReceiver()
             val params = createCompactLayoutParams()
 
             try {
                 windowManager.addView(overlay, params)
-                isShowing = true
+                transitionTo(OverlayState.CompactEntering)
 
-                // Ultra-smooth Apple fluid entry animation
+                // Apple Fluid Spring Entrance
                 val density = context.resources.displayMetrics.density
                 val startTranslationX = if (prefs.isRightSide) 55f * density else -55f * density
 
@@ -75,8 +104,16 @@ class VolumeOverlayController(private val context: Context) {
                     .scaleX(1f)
                     .scaleY(1f)
                     .alpha(1f)
-                    .setDuration(260)
-                    .setInterpolator(appleSpringEnter)
+                    .setDuration(LiquidGlassTokens.DURATION_COMPACT_ENTER_MS)
+                    .setInterpolator(LiquidGlassTokens.INTERPOLATOR_APPLE_SPRING)
+                    .setListener(object : AnimatorListenerAdapter() {
+                        override fun onAnimationEnd(animation: Animator) {
+                            if (currentState is OverlayState.CompactEntering) {
+                                transitionTo(OverlayState.CompactVisible)
+                            }
+                            overlay.animate().setListener(null)
+                        }
+                    })
                     .start()
 
             } catch (_: Exception) {}
@@ -95,45 +132,28 @@ class VolumeOverlayController(private val context: Context) {
 
     private fun expandToMaster() {
         val overlay = overlayView ?: return
+        transitionTo(OverlayState.MasterEntering)
 
-        var windowFlags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            windowFlags = windowFlags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
-        }
-
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            windowFlags,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.CENTER
-            x = 0
-            y = 0
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val blur = prefs.blurRadius.toInt().coerceIn(25, 75)
-                setBlurBehindRadius(blur)
-            }
-        }
-
+        val masterParams = createMasterLayoutParams()
         try {
-            windowManager.updateViewLayout(overlay, params)
+            windowManager.updateViewLayout(overlay, masterParams)
         } catch (_: Exception) {}
 
         overlay.expandToMasterView()
+        transitionTo(OverlayState.MasterVisible)
         resetDismissTimer()
     }
 
     private fun collapseToCompact() {
         val overlay = overlayView ?: return
+        transitionTo(OverlayState.Collapsing)
+
         overlay.collapseToCompactView {
-            val params = createCompactLayoutParams()
+            val compactParams = createCompactLayoutParams()
             try {
-                windowManager.updateViewLayout(overlay, params)
+                windowManager.updateViewLayout(overlay, compactParams)
             } catch (_: Exception) {}
+            transitionTo(OverlayState.CompactVisible)
         }
         resetDismissTimer()
     }
@@ -171,6 +191,11 @@ class VolumeOverlayController(private val context: Context) {
             this.x = (8 * density).toInt()
             this.y = targetY
 
+            // Prevent cutout clipping on AMOLED punch-hole displays (OPPO K13)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            }
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val blur = prefs.blurRadius.toInt().coerceIn(15, 60)
                 setBlurBehindRadius(blur)
@@ -178,9 +203,40 @@ class VolumeOverlayController(private val context: Context) {
         }
     }
 
+    private fun createMasterLayoutParams(): WindowManager.LayoutParams {
+        var windowFlags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            windowFlags = windowFlags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+        }
+
+        // In Master mode, omit FLAG_NOT_FOCUSABLE so the window can receive physical Back button events
+        return WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            windowFlags,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.CENTER
+            x = 0
+            y = 0
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val blur = prefs.blurRadius.toInt().coerceIn(25, 75)
+                setBlurBehindRadius(blur)
+            }
+        }
+    }
+
     private fun resetDismissTimer() {
         handler.removeCallbacks(dismissRunnable)
-        val delay = if (overlayView?.isExpanded == true) 6000L else prefs.timeoutMs
+        if (currentState.isUserInteracting) return // Never auto-dismiss while user is actively touching slider!
+        val delay = if (currentState.isExpanded) 6500L else prefs.timeoutMs
         handler.postDelayed(dismissRunnable, delay)
     }
 
@@ -188,7 +244,9 @@ class VolumeOverlayController(private val context: Context) {
         handler.removeCallbacks(dismissRunnable)
         val overlay = overlayView ?: return
 
-        if (isShowing) {
+        if (currentState.isVisible && currentState !is OverlayState.Dismissing) {
+            transitionTo(OverlayState.Dismissing)
+
             if (overlay.isExpanded) {
                 overlay.collapseToCompactView {
                     finishDismiss(overlay)
@@ -202,8 +260,8 @@ class VolumeOverlayController(private val context: Context) {
                     .scaleX(0.85f)
                     .scaleY(0.85f)
                     .alpha(0f)
-                    .setDuration(210)
-                    .setInterpolator(appleSmoothExit)
+                    .setDuration(LiquidGlassTokens.DURATION_COMPACT_EXIT_MS)
+                    .setInterpolator(LiquidGlassTokens.INTERPOLATOR_SMOOTH_EXIT)
                     .setListener(object : AnimatorListenerAdapter() {
                         override fun onAnimationEnd(animation: Animator) {
                             finishDismiss(overlay)
@@ -216,12 +274,36 @@ class VolumeOverlayController(private val context: Context) {
     }
 
     private fun finishDismiss(overlay: MasterVolumeOverlayView) {
+        unregisterVolumeReceiver()
         try {
-            if (isShowing) {
+            if (currentState.isVisible) {
                 windowManager.removeView(overlay)
-                isShowing = false
             }
         } catch (_: Exception) {}
+        transitionTo(OverlayState.Hidden)
         overlayView = null
+    }
+
+    private fun registerVolumeReceiver() {
+        if (!isReceiverRegistered) {
+            try {
+                val filter = IntentFilter("android.media.VOLUME_CHANGED_ACTION")
+                context.registerReceiver(volumeChangeReceiver, filter)
+                isReceiverRegistered = true
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun unregisterVolumeReceiver() {
+        if (isReceiverRegistered) {
+            try {
+                context.unregisterReceiver(volumeChangeReceiver)
+            } catch (_: Exception) {}
+            isReceiverRegistered = false
+        }
+    }
+
+    private fun transitionTo(newState: OverlayState) {
+        currentState = newState
     }
 }

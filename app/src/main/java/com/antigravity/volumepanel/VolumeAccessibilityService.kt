@@ -17,6 +17,7 @@ class VolumeAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        overlayController.dismiss()
         instance = null
     }
 
