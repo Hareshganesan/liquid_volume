@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#6366F1</color>
+    <color name="primary_variant">#4F46E5</color>
+    <color name="secondary">#06B6D4</color>
+    <color name="background_dark">#0F172A</color>
+    <color name="surface_dark">#1E293B</color>
+    <color name="card_stroke">#334155</color>
+    <color name="text_primary">#F8FAFC</color>
+    <color name="text_secondary">#94A3B8</color>
+    <color name="accent_green">#10B981</color>
+
+    <!-- Glass & Panel colors -->
+    <color name="glass_bg_dark">#401E293B</color>
+    <color name="glass_border">#20FFFFFF</color>
+    <color name="slider_track">#30FFFFFF</color>
+    <color name="slider_fill">#E2E8F0</color>
+</resources>

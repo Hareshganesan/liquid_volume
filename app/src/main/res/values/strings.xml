@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Liquid Volume</string>
+    <string name="accessibility_service_description">Enables custom frosted glass volume panel and handles volume button events smoothly.</string>
+    <string name="permission_overlay_title">1. Draw Over Apps</string>
+    <string name="permission_overlay_desc">Required to display the custom volume slider floating over your screen.</string>
+    <string name="permission_accessibility_title">2. Accessibility Service</string>
+    <string name="permission_accessibility_desc">Required to intercept volume up/down buttons and hide the default system UI.</string>
+    <string name="grant_permission">Grant Permission</string>
+    <string name="granted">Granted ✓</string>
+    <string name="preferences_title">Customization</string>
+    <string name="side_title">Slider Position</string>
+    <string name="side_right">Right Side</string>
+    <string name="side_left">Left Side</string>
+    <string name="blur_title">Glass Blur Radius</string>
+    <string name="accent_color_title">Accent Color</string>
+    <string name="test_slider">Test Volume Panel</string>
+</resources>
