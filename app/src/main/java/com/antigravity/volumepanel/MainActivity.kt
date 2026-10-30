@@ -45,26 +45,41 @@ class MainActivity : AppCompatActivity() {
 
         // Vertical Offset
         val vPos = prefs.verticalPositionPercent.coerceIn(10f, 90f)
+        binding.sliderVerticalOffset.valueFrom = 10f
+        binding.sliderVerticalOffset.valueTo = 90f
+        binding.sliderVerticalOffset.stepSize = 1f
         binding.sliderVerticalOffset.value = vPos
         binding.tvVerticalOffsetLabel.text = "Vertical Position: ${vPos.toInt()}%"
 
         // Length (Height)
         val length = prefs.sliderHeightDp.coerceIn(130, 240)
+        binding.sliderLength.valueFrom = 130f
+        binding.sliderLength.valueTo = 240f
+        binding.sliderLength.stepSize = 5f
         binding.sliderLength.value = length.toFloat()
         binding.tvLengthLabel.text = "Slider Length: $length dp"
 
         // Width (Thickness)
         val width = prefs.sliderWidthDp.coerceIn(36, 56)
+        binding.sliderWidth.valueFrom = 36f
+        binding.sliderWidth.valueTo = 56f
+        binding.sliderWidth.stepSize = 2f
         binding.sliderWidth.value = width.toFloat()
         binding.tvWidthLabel.text = "Slider Thickness: $width dp"
 
         // Timeout
         val timeoutSec = (prefs.timeoutMs / 1000f).coerceIn(1.0f, 6.0f)
+        binding.sliderTimeout.valueFrom = 1.0f
+        binding.sliderTimeout.valueTo = 6.0f
+        binding.sliderTimeout.stepSize = 0.5f
         binding.sliderTimeout.value = timeoutSec
         binding.tvTimeoutLabel.text = "Auto-Dismiss Timeout: ${String.format("%.1f", timeoutSec)} seconds"
 
         // Blur
         val blur = prefs.blurRadius.coerceIn(15f, 60f)
+        binding.sliderBlur.valueFrom = 15f
+        binding.sliderBlur.valueTo = 60f
+        binding.sliderBlur.stepSize = 5f
         binding.sliderBlur.value = blur
         binding.tvBlurLabel.text = "Glass Background Blur: ${blur.toInt()} px"
 

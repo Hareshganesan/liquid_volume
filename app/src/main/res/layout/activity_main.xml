@@ -54,7 +54,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="CENTER_VERTICAL"
+                android:gravity="center_vertical"
                 android:padding="16dp">
 
                 <LinearLayout
@@ -99,7 +99,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="CENTER_VERTICAL"
+                android:gravity="center_vertical"
                 android:padding="16dp">
 
                 <LinearLayout
@@ -217,11 +217,7 @@
                 <com.google.android.material.slider.Slider
                     android:id="@+id/sliderVerticalOffset"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:value="42.0"
-                    app:valueFrom="10.0"
-                    app:valueTo="90.0"
-                    app:stepSize="1.0" />
+                    android:layout_height="wrap_content" />
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -265,11 +261,7 @@
                 <com.google.android.material.slider.Slider
                     android:id="@+id/sliderLength"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:value="180.0"
-                    app:valueFrom="130.0"
-                    app:valueTo="240.0"
-                    app:stepSize="5.0" />
+                    android:layout_height="wrap_content" />
 
                 <View
                     android:layout_width="match_parent"
@@ -290,11 +282,7 @@
                 <com.google.android.material.slider.Slider
                     android:id="@+id/sliderWidth"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:value="46.0"
-                    app:valueFrom="36.0"
-                    app:valueTo="56.0"
-                    app:stepSize="2.0" />
+                    android:layout_height="wrap_content" />
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -346,11 +334,7 @@
                 <com.google.android.material.slider.Slider
                     android:id="@+id/sliderTimeout"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:value="2.5"
-                    app:valueFrom="1.0"
-                    app:valueTo="6.0"
-                    app:stepSize="0.5" />
+                    android:layout_height="wrap_content" />
 
                 <View
                     android:layout_width="match_parent"
@@ -371,11 +355,7 @@
                 <com.google.android.material.slider.Slider
                     android:id="@+id/sliderBlur"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:value="40.0"
-                    app:valueFrom="15.0"
-                    app:valueTo="60.0"
-                    app:stepSize="5.0" />
+                    android:layout_height="wrap_content" />
 
                 <View
                     android:layout_width="match_parent"
