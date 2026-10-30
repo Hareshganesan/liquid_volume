@@ -14,6 +14,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
+import androidx.core.content.ContextCompat
 
 /**
  * Production-Quality WindowManager & Lifecycle Orchestrator
@@ -21,8 +22,9 @@ import android.view.WindowManager
  * Responsibilities:
  * - Formal OverlayState machine to eliminate race conditions and collision glitches.
  * - Dynamic WindowManager layout re-targeting (Compact Edge ➔ Master Center Modal).
- * - System Volume BroadcastReceiver (android.media.VOLUME_CHANGED_ACTION) for real-time external synchronization.
- * - Dynamic active stream re-binding on hardware events.
+ * - System Volume BroadcastReceiver (android.media.VOLUME_CHANGED_ACTION) with RECEIVER_EXPORTED for API 34+.
+ * - Canonical Application-scoped AudioManager instance to prevent service scoping limitations.
+ * - Dynamic active stream re-binding on hardware events and external broadcasts.
  * - Focus arbitration (Pass-through touch in Compact; Back-button capture in Master).
  * - True hardware blur support (FLAG_BLUR_BEHIND) on API 31+ with safe bounds.
  * - Apple fluid spring animations for entrance, collapse, and bezel-anchored dismissal.
@@ -30,7 +32,7 @@ import android.view.WindowManager
 class VolumeOverlayController(private val context: Context) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val audioManager = (context.applicationContext ?: context).getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val prefs = PreferencesManager(context)
     private val handler = Handler(Looper.getMainLooper())
 
@@ -40,7 +42,7 @@ class VolumeOverlayController(private val context: Context) {
 
     private val dismissRunnable = Runnable { dismiss() }
 
-    // External System Volume Broadcast Receiver
+    // External System Volume Broadcast Receiver (Registered with ContextCompat.RECEIVER_EXPORTED for Android 14+)
     private var isReceiverRegistered = false
     private val volumeChangeReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, intent: Intent?) {
@@ -55,6 +57,7 @@ class VolumeOverlayController(private val context: Context) {
                     if (overlay != null && !overlay.isExpanded) {
                         // Dynamically bind compact slider to the active stream changed by Android OS
                         if (overlay.compactSlider.streamType != streamType) {
+                            Log.d("LiquidVolume", "Switching compactSlider to newly adjusted active stream: $streamType")
                             overlay.compactSlider.updateStreamType(streamType)
                         }
                     }
@@ -66,6 +69,7 @@ class VolumeOverlayController(private val context: Context) {
 
     fun show(direction: Int = 0) {
         handler.removeCallbacks(dismissRunnable)
+        Log.d("LiquidVolume", "VolumeOverlayController.show(direction=$direction, currentState=$currentState)")
 
         if (overlayView == null) {
             overlayView = MasterVolumeOverlayView(
@@ -315,9 +319,14 @@ class VolumeOverlayController(private val context: Context) {
         if (!isReceiverRegistered) {
             try {
                 val filter = IntentFilter("android.media.VOLUME_CHANGED_ACTION")
-                context.registerReceiver(volumeChangeReceiver, filter)
+                ContextCompat.registerReceiver(
+                    context,
+                    volumeChangeReceiver,
+                    filter,
+                    ContextCompat.RECEIVER_EXPORTED
+                )
                 isReceiverRegistered = true
-                Log.d("LiquidVolume", "Registered VOLUME_CHANGED_ACTION receiver")
+                Log.d("LiquidVolume", "Registered VOLUME_CHANGED_ACTION receiver with RECEIVER_EXPORTED")
             } catch (e: Exception) {
                 Log.w("LiquidVolume", "Failed to register volumeChangeReceiver: ${e.message}")
             }

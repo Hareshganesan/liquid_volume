@@ -36,7 +36,7 @@ class VolumeAccessibilityService : AccessibilityService() {
         when (event.keyCode) {
             KeyEvent.KEYCODE_VOLUME_UP -> {
                 if (event.action == KeyEvent.ACTION_DOWN) {
-                    Log.d("LiquidVolume", "Hardware Key: VOLUME_UP pressed")
+                    Log.d("LiquidVolume", "AccessibilityService.onKeyEvent: VOLUME_UP ACTION_DOWN")
                     overlayController.show(direction = 1)
                 }
                 // Return true for BOTH DOWN and UP to fully suppress the default ColorOS dialog
@@ -44,7 +44,7 @@ class VolumeAccessibilityService : AccessibilityService() {
             }
             KeyEvent.KEYCODE_VOLUME_DOWN -> {
                 if (event.action == KeyEvent.ACTION_DOWN) {
-                    Log.d("LiquidVolume", "Hardware Key: VOLUME_DOWN pressed")
+                    Log.d("LiquidVolume", "AccessibilityService.onKeyEvent: VOLUME_DOWN ACTION_DOWN")
                     overlayController.show(direction = -1)
                 }
                 // Return true for BOTH DOWN and UP
@@ -67,6 +67,7 @@ class VolumeAccessibilityService : AccessibilityService() {
             private set
 
         fun triggerTest(direction: Int = 0) {
+            Log.d("LiquidVolume", "VolumeAccessibilityService.triggerTest(direction=$direction)")
             instance?.overlayController?.show(direction)
         }
     }

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -173,6 +174,7 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
+            Log.d("LiquidVolume", "MainActivity.btnTestPanel clicked: serviceActive=${VolumeAccessibilityService.instance != null}")
             if (VolumeAccessibilityService.instance != null) {
                 VolumeAccessibilityService.triggerTest(0)
             } else {

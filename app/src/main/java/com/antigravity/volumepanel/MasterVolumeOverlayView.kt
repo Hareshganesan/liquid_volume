@@ -498,12 +498,32 @@ class MasterVolumeOverlayView(
             audioManager.mode == AudioManager.MODE_IN_CALL || audioManager.mode == AudioManager.MODE_IN_COMMUNICATION -> AudioManager.STREAM_VOICE_CALL
             audioManager.mode == AudioManager.MODE_RINGTONE -> AudioManager.STREAM_RING
             audioManager.isMusicActive -> AudioManager.STREAM_MUSIC
-            else -> AudioManager.STREAM_MUSIC
+            else -> {
+                // Query active playback configurations (API 26+)
+                var detected = -1
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    try {
+                        val configs = audioManager.activePlaybackConfigurations
+                        for (config in configs) {
+                            if (config.isActive) {
+                                val s = config.audioAttributes?.volumeControlStream
+                                if (s != null && s != -1) {
+                                    detected = s
+                                    break
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+                if (detected != -1) detected else AudioManager.STREAM_MUSIC
+            }
         }
+        Log.d("LiquidVolume", "updateActiveStream: selectedStream=$activeStream (isMusicActive=${audioManager.isMusicActive}, mode=${audioManager.mode})")
         compactSlider.updateStreamType(activeStream)
     }
 
     fun handleHardwareKeyStep(direction: Int) {
+        Log.d("LiquidVolume", "handleHardwareKeyStep(direction=$direction) calling adjustSuggestedStreamVolume")
         try {
             audioManager.adjustSuggestedStreamVolume(direction, AudioManager.USE_DEFAULT_STREAM_TYPE, 0)
         } catch (e: Exception) {
@@ -519,6 +539,7 @@ class MasterVolumeOverlayView(
     }
 
     fun onExternalVolumeChange(streamType: Int, volume: Int) {
+        Log.d("LiquidVolume", "MasterVolumeOverlayView.onExternalVolumeChange: streamType=$streamType, volume=$volume")
         if (compactSlider.streamType == streamType) {
             compactSlider.refreshVolume(volume)
         }

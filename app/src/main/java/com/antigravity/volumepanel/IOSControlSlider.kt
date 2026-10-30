@@ -32,10 +32,10 @@ import kotlin.math.roundToInt
  * - Zero heap allocations inside onDraw() for sustained 120 FPS rendering.
  * - Dynamic minVolume (API 28+) to maxVolume mapping with discrete step quantization.
  * - Direct finger-to-volume tracking with audio stream synchronization.
+ * - Immediate volume readback with automatic adjustStreamVolume fallback for OEM overlays.
  * - Delayed broadcast debounce window (600ms) to eliminate post-drag snapping/bouncing.
  * - Safe swipe-to-dismiss vector calculation (differentiates vertical drag from bezel swipe).
  * - Dual-pass canvas clipping for authentic Apple two-tone split inversion.
- * - Fluid elastic width spring (+10dp) on finger touch.
  * - Targeted debug logging for ADB logcat verification.
  */
 @SuppressLint("ViewConstructor")
@@ -407,29 +407,10 @@ class IOSControlSlider(
         val range = (maxVolume - minVolume).coerceAtLeast(1)
         val targetVol = (minVolume + (progress * range)).roundToInt().coerceIn(minVolume, maxVolume)
 
+        Log.d("LiquidVolume", "TouchHandler: touchY=$touchY, progress=${String.format("%.2f", progress)}, stream=$streamType, targetVol=$targetVol/$maxVolume, currentVol=$currentSystemVolume, isMaster=$isMasterMode")
+
         if (targetVol != currentSystemVolume || targetVol != lastSettledVolume) {
-            lastSettledVolume = targetVol
-            currentSystemVolume = targetVol
-
-            Log.d("LiquidVolume", "Applying Volume: stream=$streamType, targetVol=$targetVol/$maxVolume (min=$minVolume, progress=${String.format("%.2f", progress)})")
-
-            try {
-                // Flag 0 during rapid dragging ensures instant execution without audio buffer stalls
-                audioManager.setStreamVolume(streamType, targetVol, 0)
-            } catch (e: Exception) {
-                Log.w("LiquidVolume", "setStreamVolume failed for stream $streamType: ${e.message}")
-            }
-
-            if (targetVol > 0) {
-                lastNonZeroVolume = targetVol
-            }
-
-            // Tactile Haptic Feedback
-            if (targetVol == minVolume || targetVol == maxVolume) {
-                vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
-            } else {
-                vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
-            }
+            applySystemVolume(targetVol)
         }
 
         animatedProgress = progress
@@ -437,25 +418,79 @@ class IOSControlSlider(
         invalidate()
     }
 
+    private fun applySystemVolume(targetVol: Int) {
+        lastSettledVolume = targetVol
+        currentSystemVolume = targetVol
+
+        val callingComponent = if (isMasterMode) "MasterOverlayView" else "CompactOverlaySlider"
+        Log.d("LiquidVolume", "AudioController [$callingComponent]: requestSetVolume stream=$streamType, targetVol=$targetVol, maxVol=$maxVolume, minVol=$minVolume")
+
+        var success = false
+        try {
+            // Attempt 1: Standard setStreamVolume with FLAG_ALLOW_RINGER_MODES for safe transitions
+            val flags = if (streamType == AudioManager.STREAM_RING) AudioManager.FLAG_ALLOW_RINGER_MODES else 0
+            audioManager.setStreamVolume(streamType, targetVol, flags)
+            success = true
+        } catch (e: Exception) {
+            Log.e("LiquidVolume", "setStreamVolume FAILED for stream $streamType: ${e.javaClass.simpleName} - ${e.message}")
+            try {
+                audioManager.setStreamVolume(streamType, targetVol, 0)
+                success = true
+            } catch (e2: Exception) {
+                Log.e("LiquidVolume", "setStreamVolume fallback FAILED: ${e2.message}")
+            }
+        }
+
+        // Volume Readback Verification
+        val readbackVol = try {
+            audioManager.getStreamVolume(streamType)
+        } catch (e: Exception) {
+            -1
+        }
+
+        Log.d("LiquidVolume", "VolumeReadback: stream=$streamType, requested=$targetVol, observed=$readbackVol, success=$success")
+
+        // If direct setStreamVolume had no effect (OEM background overlay restriction), apply incremental adjustment fallback
+        if (readbackVol != -1 && readbackVol != targetVol) {
+            val diff = targetVol - readbackVol
+            Log.d("LiquidVolume", "Applying adjustStreamVolume fallback: diff=$diff for stream $streamType")
+            val direction = if (diff > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
+            val steps = abs(diff)
+            for (step in 1..steps) {
+                try {
+                    audioManager.adjustStreamVolume(streamType, direction, 0)
+                } catch (e: Exception) {
+                    Log.w("LiquidVolume", "adjustStreamVolume fallback error: ${e.message}")
+                }
+            }
+            val finalReadback = try { audioManager.getStreamVolume(streamType) } catch (_: Exception) { -1 }
+            Log.d("LiquidVolume", "FinalVolumeReadback after fallback: stream=$streamType, observed=$finalReadback")
+            if (finalReadback != -1) {
+                currentSystemVolume = finalReadback
+            }
+        }
+
+        if (targetVol > minVolume) {
+            lastNonZeroVolume = targetVol
+        }
+
+        // Tactile Haptic Feedback
+        if (targetVol == minVolume || targetVol == maxVolume) {
+            vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
+        } else {
+            vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+        }
+    }
+
     private fun toggleMute() {
         updateBounds()
         val curVol = try { audioManager.getStreamVolume(streamType) } catch (_: Exception) { currentSystemVolume }
         if (curVol > minVolume) {
             lastNonZeroVolume = curVol
-            try {
-                audioManager.setStreamVolume(streamType, minVolume, 0)
-                currentSystemVolume = minVolume
-            } catch (e: Exception) {
-                Log.w("LiquidVolume", "Mute toggle failed: ${e.message}")
-            }
+            applySystemVolume(minVolume)
         } else {
             val restoreVol = if (lastNonZeroVolume > minVolume) lastNonZeroVolume else ((maxVolume + minVolume) / 2).coerceAtLeast(minVolume + 1)
-            try {
-                audioManager.setStreamVolume(streamType, restoreVol, 0)
-                currentSystemVolume = restoreVol
-            } catch (e: Exception) {
-                Log.w("LiquidVolume", "Unmute restore failed: ${e.message}")
-            }
+            applySystemVolume(restoreVol)
         }
         vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
         refreshVolume(immediate = false)
