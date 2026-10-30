@@ -36,24 +36,45 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
-        // Position
+        // Screen Side
         if (prefs.isRightSide) {
             binding.rbRight.isChecked = true
         } else {
             binding.rbLeft.isChecked = true
         }
 
-        // Blur
-        binding.sliderBlur.value = prefs.blurRadius.coerceIn(10f, 60f)
-        binding.tvBlurLabel.text = "Glass Blur Radius: ${prefs.blurRadius.toInt()} px"
+        // Vertical Offset
+        val vPos = prefs.verticalPositionPercent.coerceIn(10f, 90f)
+        binding.sliderVerticalOffset.value = vPos
+        binding.tvVerticalOffsetLabel.text = "Vertical Position: ${vPos.toInt()}%"
 
-        // Accent Colors
+        // Length (Height)
+        val length = prefs.sliderHeightDp.coerceIn(130, 240)
+        binding.sliderLength.value = length.toFloat()
+        binding.tvLengthLabel.text = "Slider Length: $length dp"
+
+        // Width (Thickness)
+        val width = prefs.sliderWidthDp.coerceIn(36, 56)
+        binding.sliderWidth.value = width.toFloat()
+        binding.tvWidthLabel.text = "Slider Thickness: $width dp"
+
+        // Timeout
+        val timeoutSec = (prefs.timeoutMs / 1000f).coerceIn(1.0f, 6.0f)
+        binding.sliderTimeout.value = timeoutSec
+        binding.tvTimeoutLabel.text = "Auto-Dismiss Timeout: ${String.format("%.1f", timeoutSec)} seconds"
+
+        // Blur
+        val blur = prefs.blurRadius.coerceIn(15f, 60f)
+        binding.sliderBlur.value = blur
+        binding.tvBlurLabel.text = "Glass Background Blur: ${blur.toInt()} px"
+
+        // Accent Theme Chips
         when (prefs.accentColorHex.uppercase()) {
+            "#4F46E5", "#6366F1" -> binding.chipIndigo.isChecked = true
             "#06B6D4" -> binding.chipCyan.isChecked = true
-            "#10B981" -> binding.chipGreen.isChecked = true
-            "#F59E0B" -> binding.chipAmber.isChecked = true
+            "#10B981" -> binding.chipEmerald.isChecked = true
             "#F43F5E" -> binding.chipRose.isChecked = true
-            else -> binding.chipIndigo.isChecked = true
+            else -> binding.chipWhite.isChecked = true
         }
     }
 
@@ -72,32 +93,56 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-        // Position change
+        // Side Change
         binding.rgSide.setOnCheckedChangeListener { _, checkedId ->
             prefs.isRightSide = (checkedId == R.id.rbRight)
         }
 
-        // Blur change
-        binding.sliderBlur.addOnChangeListener { _, value, _ ->
-            prefs.blurRadius = value
-            binding.tvBlurLabel.text = "Glass Blur Radius: ${value.toInt()} px"
+        // Vertical Offset
+        binding.sliderVerticalOffset.addOnChangeListener { _, value, _ ->
+            prefs.verticalPositionPercent = value
+            binding.tvVerticalOffsetLabel.text = "Vertical Position: ${value.toInt()}%"
         }
 
-        // Accent colors
+        // Length
+        binding.sliderLength.addOnChangeListener { _, value, _ ->
+            prefs.sliderHeightDp = value.toInt()
+            binding.tvLengthLabel.text = "Slider Length: ${value.toInt()} dp"
+        }
+
+        // Width
+        binding.sliderWidth.addOnChangeListener { _, value, _ ->
+            prefs.sliderWidthDp = value.toInt()
+            binding.tvWidthLabel.text = "Slider Thickness: ${value.toInt()} dp"
+        }
+
+        // Timeout
+        binding.sliderTimeout.addOnChangeListener { _, value, _ ->
+            prefs.timeoutMs = (value * 1000L).toLong()
+            binding.tvTimeoutLabel.text = "Auto-Dismiss Timeout: ${String.format("%.1f", value)} seconds"
+        }
+
+        // Blur
+        binding.sliderBlur.addOnChangeListener { _, value, _ ->
+            prefs.blurRadius = value
+            binding.tvBlurLabel.text = "Glass Background Blur: ${value.toInt()} px"
+        }
+
+        // Colors
         binding.chipGroupColors.setOnCheckedStateChangeListener { _, checkedIds ->
             if (checkedIds.isNotEmpty()) {
                 val colorHex = when (checkedIds.first()) {
+                    R.id.chipIndigo -> "#6366F1"
                     R.id.chipCyan -> "#06B6D4"
-                    R.id.chipGreen -> "#10B981"
-                    R.id.chipAmber -> "#F59E0B"
+                    R.id.chipEmerald -> "#10B981"
                     R.id.chipRose -> "#F43F5E"
-                    else -> "#6366F1"
+                    else -> "#F8FAFC"
                 }
                 prefs.accentColorHex = colorHex
             }
         }
 
-        // Test button
+        // Live Test Button
         binding.btnTestPanel.setOnClickListener {
             if (!Settings.canDrawOverlays(this)) {
                 Toast.makeText(this, "Please grant 'Draw Over Apps' permission first", Toast.LENGTH_SHORT).show()
@@ -113,7 +158,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updatePermissionStates() {
-        // Overlay permission
         val hasOverlay = Settings.canDrawOverlays(this)
         if (hasOverlay) {
             binding.btnGrantOverlay.text = getString(R.string.granted)
@@ -125,7 +169,6 @@ class MainActivity : AppCompatActivity() {
             binding.btnGrantOverlay.setBackgroundColor(ContextCompat.getColor(this, R.color.primary))
         }
 
-        // Accessibility permission
         val hasAccessibility = isAccessibilityServiceEnabled()
         if (hasAccessibility) {
             binding.btnGrantAccessibility.text = getString(R.string.granted)

@@ -25,7 +25,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Native GPU-accelerated frosted glass volume panel"
+            android:text="Flagship iOS 18 &amp; ColorOS Master Audio Suite"
             android:textColor="@color/text_secondary"
             android:textSize="14sp" />
 
@@ -33,19 +33,18 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
-            android:layout_marginBottom="12dp"
-            android:text="REQUIRED PERMISSIONS"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="10dp"
+            android:text="PERMISSIONS"
             android:textColor="@color/primary"
             android:textSize="12sp"
             android:textStyle="bold"
             android:letterSpacing="0.08" />
 
-        <!-- Overlay Permission Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
+            android:layout_marginBottom="10dp"
             app:cardBackgroundColor="@color/surface_dark"
             app:cardCornerRadius="16dp"
             app:strokeColor="@color/card_stroke"
@@ -54,41 +53,43 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
+                android:orientation="horizontal"
+                android:gravity="CENTER_VERTICAL"
                 android:padding="16dp">
 
-                <TextView
-                    android:id="@+id/tvOverlayTitle"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="@string/permission_overlay_title"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="@string/permission_overlay_desc"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="1. Draw Over Apps"
+                        android:textColor="@color/text_primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Display custom floating slider"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+                </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnGrantOverlay"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
                     android:text="@string/grant_permission"
                     app:cornerRadius="10dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Accessibility Permission Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="28dp"
+            android:layout_marginBottom="24dp"
             app:cardBackgroundColor="@color/surface_dark"
             app:cardCornerRadius="16dp"
             app:strokeColor="@color/card_stroke"
@@ -97,42 +98,45 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
+                android:orientation="horizontal"
+                android:gravity="CENTER_VERTICAL"
                 android:padding="16dp">
 
-                <TextView
-                    android:id="@+id/tvAccessibilityTitle"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="@string/permission_accessibility_title"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="@string/permission_accessibility_desc"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="2. Accessibility Key Service"
+                        android:textColor="@color/text_primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Intercept hardware volume keys"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+                </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnGrantAccessibility"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
                     android:text="@string/grant_permission"
                     app:cornerRadius="10dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Customization Section -->
+        <!-- Position & Alignment Section -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:text="CUSTOMIZATION"
+            android:layout_marginBottom="10dp"
+            android:text="POSITION &amp; ALIGNMENT"
             android:textColor="@color/primary"
             android:textSize="12sp"
             android:textStyle="bold"
@@ -153,11 +157,11 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <!-- Side Selection -->
+                <!-- Side Radio Buttons -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/side_title"
+                    android:text="Screen Side"
                     android:textColor="@color/text_primary"
                     android:textSize="15sp"
                     android:textStyle="bold" />
@@ -166,7 +170,7 @@
                     android:id="@+id/rgSide"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="6dp"
                     android:orientation="horizontal">
 
                     <RadioButton
@@ -174,7 +178,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:checked="true"
-                        android:text="@string/side_right"
+                        android:text="Right Side"
                         android:textColor="@color/text_primary" />
 
                     <RadioButton
@@ -182,14 +186,176 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="24dp"
-                        android:text="@string/side_left"
+                        android:text="Left Side"
                         android:textColor="@color/text_primary" />
                 </RadioGroup>
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginVertical="16dp"
+                    android:layout_marginVertical="14dp"
+                    android:background="@color/card_stroke" />
+
+                <!-- Vertical Offset Slider -->
+                <TextView
+                    android:id="@+id/tvVerticalOffsetLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Vertical Position (Align with Rocker): 42%"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Slide to position next to your physical volume buttons"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:layout_marginBottom="4dp" />
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/sliderVerticalOffset"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:value="42"
+                    android:valueFrom="10"
+                    android:valueTo="90"
+                    android:stepSize="1" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Slider Geometry (Length & Width) -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="SLIDER DIMENSIONS"
+            android:textColor="@color/primary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            app:cardBackgroundColor="@color/surface_dark"
+            app:cardCornerRadius="16dp"
+            app:strokeColor="@color/card_stroke"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <!-- Slider Height / Length -->
+                <TextView
+                    android:id="@+id/tvLengthLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Slider Length: 180 dp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/sliderLength"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:value="180"
+                    android:valueFrom="130"
+                    android:valueTo="240"
+                    android:stepSize="5" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="12dp"
+                    android:background="@color/card_stroke" />
+
+                <!-- Slider Width / Thickness -->
+                <TextView
+                    android:id="@+id/tvWidthLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Slider Thickness: 46 dp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/sliderWidth"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:value="46"
+                    android:valueFrom="36"
+                    android:valueTo="56"
+                    android:stepSize="2" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Behavior & Timeout -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="BEHAVIOR &amp; TIMEOUT"
+            android:textColor="@color/primary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            app:cardBackgroundColor="@color/surface_dark"
+            app:cardCornerRadius="16dp"
+            app:strokeColor="@color/card_stroke"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <!-- Timeout Slider -->
+                <TextView
+                    android:id="@+id/tvTimeoutLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Auto-Dismiss Timeout: 2.5 seconds"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="How long the slider remains visible after key press"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:layout_marginBottom="4dp" />
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/sliderTimeout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:value="2.5"
+                    android:valueFrom="1.0"
+                    android:valueTo="6.0"
+                    android:stepSize="0.5" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="12dp"
                     android:background="@color/card_stroke" />
 
                 <!-- Blur Radius -->
@@ -197,7 +363,7 @@
                     android:id="@+id/tvBlurLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Glass Blur Radius: 30 px"
+                    android:text="Glass Background Blur: 40 px"
                     android:textColor="@color/text_primary"
                     android:textSize="15sp"
                     android:textStyle="bold" />
@@ -206,22 +372,22 @@
                     android:id="@+id/sliderBlur"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:value="30"
-                    android:valueFrom="10"
+                    android:value="40"
+                    android:valueFrom="15"
                     android:valueTo="60"
                     android:stepSize="5" />
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginVertical="16dp"
+                    android:layout_marginVertical="12dp"
                     android:background="@color/card_stroke" />
 
-                <!-- Accent Color Picker -->
+                <!-- Liquid Color Accent -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/accent_color_title"
+                    android:text="Liquid Accent Theme"
                     android:textColor="@color/text_primary"
                     android:textSize="15sp"
                     android:textStyle="bold" />
@@ -234,11 +400,18 @@
                     app:singleSelection="true">
 
                     <com.google.android.material.chip.Chip
-                        android:id="@+id/chipIndigo"
+                        android:id="@+id/chipWhite"
                         style="@style/Widget.Material3.Chip.Filter"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:checked="true"
+                        android:text="Pure Frost (iOS)" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipIndigo"
+                        style="@style/Widget.Material3.Chip.Filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
                         android:text="Indigo" />
 
                     <com.google.android.material.chip.Chip
@@ -249,18 +422,11 @@
                         android:text="Cyan" />
 
                     <com.google.android.material.chip.Chip
-                        android:id="@+id/chipGreen"
+                        android:id="@+id/chipEmerald"
                         style="@style/Widget.Material3.Chip.Filter"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Emerald" />
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chipAmber"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Amber" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chipRose"
@@ -269,18 +435,19 @@
                         android:layout_height="wrap_content"
                         android:text="Rose" />
                 </com.google.android.material.chip.ChipGroup>
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Test Button -->
+        <!-- Big Live Test Button -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnTestPanel"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:layout_marginBottom="24dp"
-            android:text="@string/test_slider"
+            android:layout_marginBottom="30dp"
+            android:text="Test Volume Panel Live"
             android:textSize="16sp"
-            app:cornerRadius="14dp" />
+            app:cornerRadius="16dp" />
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

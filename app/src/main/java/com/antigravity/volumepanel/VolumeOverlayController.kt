@@ -45,50 +45,21 @@ class VolumeOverlayController(private val context: Context) {
         val overlay = overlayView ?: return
 
         if (!isShowing) {
-            val gravity = if (prefs.isRightSide) {
-                Gravity.END or Gravity.CENTER_VERTICAL
-            } else {
-                Gravity.START or Gravity.CENTER_VERTICAL
-            }
-
-            var windowFlags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
-
-            // Native Window Blur Behind on Android 12+
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                windowFlags = windowFlags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
-            }
-
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                windowFlags,
-                PixelFormat.TRANSLUCENT
-            ).apply {
-                this.gravity = gravity
-                x = (10 * context.resources.displayMetrics.density).toInt()
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    val blur = prefs.blurRadius.toInt().coerceIn(20, 60)
-                    setBlurBehindRadius(blur)
-                }
-            }
+            val params = createCompactLayoutParams()
 
             try {
                 windowManager.addView(overlay, params)
                 isShowing = true
 
                 // Enter animation
-                val startX = if (prefs.isRightSide) 120f else -120f
+                val startX = if (prefs.isRightSide) 140f else -140f
                 overlay.translationX = startX
                 overlay.alpha = 0f
 
                 overlay.animate()
                     .translationX(0f)
                     .alpha(1f)
-                    .setDuration(200)
+                    .setDuration(220)
                     .setInterpolator(OvershootInterpolator(1.1f))
                     .start()
 
@@ -96,18 +67,58 @@ class VolumeOverlayController(private val context: Context) {
         }
 
         if (direction != 0) {
-            overlay.handleHardwareVolumeStep(direction)
+            overlay.handleHardwareKeyStep(direction)
         } else {
-            overlay.refreshAllSliders()
+            overlay.refreshAll()
         }
 
         resetDismissTimer()
     }
 
+    private fun createCompactLayoutParams(): WindowManager.LayoutParams {
+        val density = context.resources.displayMetrics.density
+        val screenHeight = context.resources.displayMetrics.heightPixels
+
+        val gravity = if (prefs.isRightSide) {
+            Gravity.END or Gravity.TOP
+        } else {
+            Gravity.START or Gravity.TOP
+        }
+
+        val vPercent = prefs.verticalPositionPercent.coerceIn(10f, 90f) / 100f
+        val sliderHeightPx = prefs.sliderHeightDp * density
+        val targetY = ((screenHeight * vPercent) - (sliderHeightPx / 2f)).toInt().coerceAtLeast(0)
+
+        var windowFlags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            windowFlags = windowFlags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+        }
+
+        return WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            windowFlags,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            this.gravity = gravity
+            this.x = (8 * density).toInt()
+            this.y = targetY
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val blur = prefs.blurRadius.toInt().coerceIn(15, 60)
+                setBlurBehindRadius(blur)
+            }
+        }
+    }
+
     private fun resetDismissTimer() {
         handler.removeCallbacks(dismissRunnable)
-        // If user is inside Master mode, give them 5 seconds to adjust streams comfortably
-        val delay = if (overlayView?.isExpanded == true) 5000L else AUTO_DISMISS_DELAY_MS
+        // If user is inside Master mode, give them longer (6s) to adjust streams
+        val delay = if (overlayView?.isExpanded == true) 6000L else prefs.timeoutMs
         handler.postDelayed(dismissRunnable, delay)
     }
 
@@ -116,7 +127,7 @@ class VolumeOverlayController(private val context: Context) {
         val overlay = overlayView ?: return
 
         if (isShowing) {
-            val endX = if (prefs.isRightSide) 120f else -120f
+            val endX = if (prefs.isRightSide) 140f else -140f
             overlay.animate()
                 .translationX(endX)
                 .alpha(0f)
@@ -135,9 +146,5 @@ class VolumeOverlayController(private val context: Context) {
                 })
                 .start()
         }
-    }
-
-    companion object {
-        private const val AUTO_DISMISS_DELAY_MS = 2500L
     }
 }

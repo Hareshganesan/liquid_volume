@@ -3,18 +3,17 @@ package com.antigravity.volumepanel
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
 import android.media.AudioManager
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
-import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -38,13 +37,13 @@ class MasterVolumeOverlayView(
 
     private val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
 
-    // Modes
     var isExpanded = false
         private set
 
-    // Views
-    private val compactContainer = FrameLayout(context)
-    private val compactSlider = IOSCapsuleSliderView(
+    // Root Containers
+    private val backdropDim = View(context)
+    private val compactRoot = FrameLayout(context)
+    private val compactSlider = IOSControlSlider(
         context = context,
         audioManager = audioManager,
         streamType = AudioManager.STREAM_MUSIC,
@@ -52,188 +51,253 @@ class MasterVolumeOverlayView(
         onInteraction = onInteraction,
         vibrator = vibrator
     )
-    private val btnExpand = ImageView(context)
+    private val btnExpandDots = ImageView(context)
 
-    // Master Panel Views
+    // Master Dialog Elements
     private val masterCard = LinearLayout(context)
-    private val slidersRow = LinearLayout(context)
-    private val soundModeRow = LinearLayout(context)
-
-    private val masterSliders = mutableListOf<IOSCapsuleSliderView>()
+    private val slidersContainer = LinearLayout(context)
+    private val soundModeSegmented = LinearLayout(context)
+    private val masterSliders = mutableListOf<IOSControlSlider>()
 
     init {
-        setupCompactMode()
-        setupMasterMode()
-        showCompactMode()
+        setupBackdrop()
+        setupCompactLayout()
+        setupMasterLayout()
+        showCompactView()
     }
 
-    private fun setupCompactMode() {
-        val pillWidth = dpToPx(46)
-        val pillHeight = dpToPx(190)
+    private fun setupBackdrop() {
+        backdropDim.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+        backdropDim.setBackgroundColor(Color.parseColor("#4D000000")) // 30% black dim
+        backdropDim.visibility = View.GONE
+        backdropDim.setOnClickListener {
+            onInteraction()
+            collapseToCompactView()
+        }
+        addView(backdropDim)
+    }
 
-        val containerParams = LayoutParams(pillWidth + dpToPx(16), pillHeight + dpToPx(36)).apply {
+    private fun setupCompactLayout() {
+        val width = dpToPx(prefs.sliderWidthDp)
+        val height = dpToPx(prefs.sliderHeightDp)
+
+        val containerParams = LayoutParams(width + dpToPx(16), height + dpToPx(38)).apply {
             gravity = if (prefs.isRightSide) Gravity.END or Gravity.CENTER_VERTICAL else Gravity.START or Gravity.CENTER_VERTICAL
         }
-        compactContainer.layoutParams = containerParams
+        compactRoot.layoutParams = containerParams
 
-        // 3-Dots Expand Button at top
-        val btnSize = dpToPx(28)
-        val btnParams = LayoutParams(btnSize, btnSize).apply {
+        // 3-Dots Button
+        val dotSize = dpToPx(28)
+        val dotParams = LayoutParams(dotSize, dotSize).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             topMargin = dpToPx(2)
         }
-        btnExpand.layoutParams = btnParams
-        btnExpand.setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_more_horiz))
-        btnExpand.setColorFilter(Color.WHITE)
-        btnExpand.setBackgroundResource(android.R.color.transparent)
-        btnExpand.setOnClickListener {
+        btnExpandDots.layoutParams = dotParams
+        btnExpandDots.setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_more_horiz))
+        btnExpandDots.setColorFilter(Color.WHITE)
+
+        val dotBg = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.parseColor("#30FFFFFF"))
+            setStroke(dpToPx(1), Color.parseColor("#20FFFFFF"))
+        }
+        btnExpandDots.background = dotBg
+        btnExpandDots.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
+        btnExpandDots.setOnClickListener {
             onInteraction()
-            expandToMasterMode()
+            expandToMasterView()
         }
 
-        // The Compact Pill Slider
-        val sliderParams = LayoutParams(LayoutParams.MATCH_PARENT, pillHeight).apply {
+        // Compact Slider
+        val sliderParams = LayoutParams(LayoutParams.MATCH_PARENT, height).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
         }
         compactSlider.layoutParams = sliderParams
 
-        compactContainer.addView(compactSlider)
-        compactContainer.addView(btnExpand)
-        addView(compactContainer)
+        compactRoot.addView(compactSlider)
+        compactRoot.addView(btnExpandDots)
+        addView(compactRoot)
     }
 
-    private fun setupMasterMode() {
+    private fun setupMasterLayout() {
         masterCard.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
             gravity = Gravity.CENTER
         }
         masterCard.orientation = LinearLayout.VERTICAL
-        masterCard.setPadding(dpToPx(20), dpToPx(18), dpToPx(20), dpToPx(18))
+        masterCard.setPadding(dpToPx(24), dpToPx(22), dpToPx(24), dpToPx(22))
 
-        // Frosted Card Glass Background
-        val cardBg = android.graphics.drawable.GradientDrawable().apply {
-            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-            cornerRadius = dpToPx(32).toFloat()
-            setColor(Color.parseColor("#4A131620")) // Deep glass tint
-            setStroke(dpToPx(1), Color.parseColor("#38FFFFFF")) // Glowing glass rim
+        // Card Glass Effect
+        val cardBg = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dpToPx(34).toFloat()
+            setColor(Color.parseColor("#44101422")) // Deep Frosted Glass
+            setStroke(dpToPx(1), Color.parseColor("#40FFFFFF")) // Specular border
         }
         masterCard.background = cardBg
 
-        // Header Row (Title + Close Button)
-        val headerRow = LinearLayout(context).apply {
+        // Header (Title + Subtitle + Close Button)
+        val header = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         }
 
-        val tvTitle = TextView(context).apply {
-            text = "Audio Control"
-            setTextColor(Color.WHITE)
-            textSize = 17f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        val titleCol = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
+
+        val tvTitle = TextView(context).apply {
+            text = "Audio Control Center"
+            setTextColor(Color.WHITE)
+            textSize = 18f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        val tvSub = TextView(context).apply {
+            text = "Tap icons to mute streams"
+            setTextColor(Color.parseColor("#94A3B8"))
+            textSize = 12f
+        }
+        titleCol.addView(tvTitle)
+        titleCol.addView(tvSub)
 
         val btnClose = ImageView(context).apply {
             layoutParams = LinearLayout.LayoutParams(dpToPx(32), dpToPx(32))
             setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_volume_mute))
-            setColorFilter(Color.parseColor("#94A3B8"))
+            setColorFilter(Color.WHITE)
+            val closeBg = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#28FFFFFF"))
+            }
+            background = closeBg
+            setPadding(dpToPx(6), dpToPx(6), dpToPx(6), dpToPx(6))
             setOnClickListener {
                 onInteraction()
-                collapseToCompactMode()
+                collapseToCompactView()
             }
         }
 
-        headerRow.addView(tvTitle)
-        headerRow.addView(btnClose)
-        masterCard.addView(headerRow)
+        header.addView(titleCol)
+        header.addView(btnClose)
+        masterCard.addView(header)
 
-        // 4 Sliders Row
-        slidersRow.orientation = LinearLayout.HORIZONTAL
-        slidersRow.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-            topMargin = dpToPx(16)
-            bottomMargin = dpToPx(16)
+        // Sliders Row
+        slidersContainer.orientation = LinearLayout.HORIZONTAL
+        slidersContainer.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dpToPx(20)
+            bottomMargin = dpToPx(20)
         }
 
         val streams = listOf(
             Triple("Media", AudioManager.STREAM_MUSIC, R.drawable.ic_volume_up),
-            Triple("Ring", AudioManager.STREAM_RING, R.drawable.ic_bell),
-            Triple("Notif", AudioManager.STREAM_NOTIFICATION, R.drawable.ic_notifications),
+            Triple("Ringtone", AudioManager.STREAM_RING, R.drawable.ic_bell),
+            Triple("Alerts", AudioManager.STREAM_NOTIFICATION, R.drawable.ic_notifications),
             Triple("Alarm", AudioManager.STREAM_ALARM, R.drawable.ic_alarm)
         )
 
         masterSliders.clear()
         for ((label, streamType, iconRes) in streams) {
-            val streamColumn = LinearLayout(context).apply {
+            val col = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
                 layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    marginEnd = dpToPx(12)
+                    marginEnd = dpToPx(14)
                 }
             }
 
-            val slider = IOSCapsuleSliderView(
+            val slider = IOSControlSlider(
                 context = context,
                 audioManager = audioManager,
                 streamType = streamType,
                 prefs = prefs,
                 onInteraction = onInteraction,
                 vibrator = vibrator,
-                customIconRes = iconRes
+                customIconRes = iconRes,
+                isMasterMode = true
             ).apply {
-                layoutParams = LinearLayout.LayoutParams(dpToPx(48), dpToPx(170))
+                layoutParams = LinearLayout.LayoutParams(dpToPx(52), dpToPx(160))
             }
             masterSliders.add(slider)
 
             val tvLabel = TextView(context).apply {
                 text = label
-                setTextColor(Color.parseColor("#94A3B8"))
+                setTextColor(Color.parseColor("#CBD5E1"))
                 textSize = 12f
-                gravity = Gravity.CENTER
-                setPadding(0, dpToPx(6), 0, 0)
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                setPadding(0, dpToPx(8), 0, 0)
             }
 
-            streamColumn.addView(slider)
-            streamColumn.addView(tvLabel)
-            slidersRow.addView(streamColumn)
+            col.addView(slider)
+            col.addView(tvLabel)
+            slidersContainer.addView(col)
         }
+        masterCard.addView(slidersContainer)
 
-        masterCard.addView(slidersRow)
-
-        // Sound Mode Selector Row (Ring, Vibrate, Silent)
-        setupSoundModeSelector()
-        masterCard.addView(soundModeRow)
+        // Sound Mode Segmented Switch
+        setupSegmentedSoundBar()
+        masterCard.addView(soundModeSegmented)
 
         masterCard.visibility = View.GONE
         addView(masterCard)
     }
 
-    private fun setupSoundModeSelector() {
-        soundModeRow.orientation = LinearLayout.HORIZONTAL
-        soundModeRow.gravity = Gravity.CENTER
-        soundModeRow.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-            topMargin = dpToPx(6)
+    private fun setupSegmentedSoundBar() {
+        soundModeSegmented.removeAllViews()
+        soundModeSegmented.orientation = LinearLayout.HORIZONTAL
+        soundModeSegmented.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(44)).apply {
+            topMargin = dpToPx(4)
         }
 
+        val barBg = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dpToPx(16).toFloat()
+            setColor(Color.parseColor("#28161A26"))
+            setStroke(dpToPx(1), Color.parseColor("#20FFFFFF"))
+        }
+        soundModeSegmented.background = barBg
+        soundModeSegmented.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
+
         val modes = listOf(
-            Triple("Ring", AudioManager.RINGER_MODE_NORMAL, R.drawable.ic_bell),
+            Triple("Silent", AudioManager.RINGER_MODE_SILENT, R.drawable.ic_volume_mute),
             Triple("Vibrate", AudioManager.RINGER_MODE_VIBRATE, R.drawable.ic_vibrate),
-            Triple("Mute", AudioManager.RINGER_MODE_SILENT, R.drawable.ic_volume_mute)
+            Triple("Ring", AudioManager.RINGER_MODE_NORMAL, R.drawable.ic_bell)
         )
 
+        val currentMode = audioManager.ringerMode
+
         for ((name, mode, iconRes) in modes) {
-            val modeBtn = TextView(context).apply {
-                text = name
-                textSize = 13f
-                setTextColor(Color.WHITE)
+            val isSelected = (currentMode == mode)
+            val btn = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER
-                setPadding(dpToPx(14), dpToPx(8), dpToPx(14), dpToPx(8))
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                    marginEnd = dpToPx(6)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+
+                if (isSelected) {
+                    val activeBg = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = dpToPx(12).toFloat()
+                        setColor(Color.parseColor(prefs.accentColorHex))
+                    }
+                    background = activeBg
                 }
 
-                val currentRinger = audioManager.ringerMode
-                val isSelected = (currentRinger == mode)
-                background = createPillDrawable(isSelected)
+                val icon = ImageView(context).apply {
+                    layoutParams = LinearLayout.LayoutParams(dpToPx(16), dpToPx(16)).apply {
+                        marginEnd = dpToPx(6)
+                    }
+                    setImageDrawable(ContextCompat.getDrawable(context, iconRes))
+                    setColorFilter(if (isSelected) Color.parseColor("#0F172A") else Color.WHITE)
+                }
+
+                val label = TextView(context).apply {
+                    text = name
+                    textSize = 13f
+                    setTextColor(if (isSelected) Color.parseColor("#0F172A") else Color.WHITE)
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                }
+
+                addView(icon)
+                addView(label)
 
                 setOnClickListener {
                     onInteraction()
@@ -241,38 +305,28 @@ class MasterVolumeOverlayView(
                         audioManager.ringerMode = mode
                         vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
                     } catch (_: Exception) {}
-                    setupSoundModeSelector() // Refresh buttons
-                    refreshAllSliders()
+                    setupSegmentedSoundBar()
+                    refreshAll()
                 }
             }
-            soundModeRow.addView(modeBtn)
+            soundModeSegmented.addView(btn)
         }
     }
 
-    private fun createPillDrawable(selected: Boolean): android.graphics.drawable.GradientDrawable {
-        return android.graphics.drawable.GradientDrawable().apply {
-            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-            cornerRadius = dpToPx(14).toFloat()
-            if (selected) {
-                setColor(Color.parseColor(prefs.accentColorHex))
-            } else {
-                setColor(Color.parseColor("#25FFFFFF"))
-                setStroke(dpToPx(1), Color.parseColor("#30FFFFFF"))
-            }
-        }
-    }
-
-    fun showCompactMode() {
+    fun showCompactView() {
         isExpanded = false
+        backdropDim.visibility = View.GONE
         masterCard.visibility = View.GONE
-        compactContainer.visibility = View.VISIBLE
+        compactRoot.visibility = View.VISIBLE
         compactSlider.refreshVolume()
     }
 
-    fun expandToMasterMode() {
+    fun expandToMasterView() {
         isExpanded = true
-        compactContainer.visibility = View.GONE
+        compactRoot.visibility = View.GONE
+        backdropDim.visibility = View.VISIBLE
         masterCard.visibility = View.VISIBLE
+
         masterCard.scaleX = 0.85f
         masterCard.scaleY = 0.85f
         masterCard.alpha = 0f
@@ -285,11 +339,12 @@ class MasterVolumeOverlayView(
             .setInterpolator(OvershootInterpolator(1.1f))
             .start()
 
-        refreshAllSliders()
+        refreshAll()
     }
 
-    fun collapseToCompactMode() {
+    fun collapseToCompactView() {
         isExpanded = false
+        backdropDim.visibility = View.GONE
         masterCard.animate()
             .scaleX(0.85f)
             .scaleY(0.85f)
@@ -298,25 +353,24 @@ class MasterVolumeOverlayView(
             .setInterpolator(DecelerateInterpolator())
             .withEndAction {
                 masterCard.visibility = View.GONE
-                compactContainer.visibility = View.VISIBLE
+                compactRoot.visibility = View.VISIBLE
                 compactSlider.refreshVolume()
             }
             .start()
     }
 
-    fun handleHardwareVolumeStep(direction: Int) {
-        // Intelligently adjusts the active stream
+    fun handleHardwareKeyStep(direction: Int) {
         audioManager.adjustSuggestedStreamVolume(direction, AudioManager.USE_DEFAULT_STREAM_TYPE, 0)
         vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
 
         if (isExpanded) {
-            refreshAllSliders()
+            refreshAll()
         } else {
             compactSlider.refreshVolume()
         }
     }
 
-    fun refreshAllSliders() {
+    fun refreshAll() {
         compactSlider.refreshVolume()
         for (s in masterSliders) {
             s.refreshVolume()
@@ -329,49 +383,57 @@ class MasterVolumeOverlayView(
 }
 
 /**
- * High-performance iOS 18 Styled Liquid Glass Capsule Slider
+ * Super-polished iOS 18 Control Center Slider
  */
 @SuppressLint("ViewConstructor")
-class IOSCapsuleSliderView(
+class IOSControlSlider(
     context: Context,
     private val audioManager: AudioManager,
     val streamType: Int,
     private val prefs: PreferencesManager,
     private val onInteraction: () -> Unit,
     private val vibrator: Vibrator?,
-    private val customIconRes: Int? = null
+    private val customIconRes: Int? = null,
+    private val isMasterMode: Boolean = false
 ) : View(context) {
-
-    private val normalWidth = dpToPx(44).toFloat()
-    private val expandedWidth = dpToPx(54).toFloat()
-    private var currentPillWidth = normalWidth
-    private val pillHeight = dpToPx(170).toFloat()
-
-    private val glassBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-        color = Color.parseColor("#34141722") // Frosted glass dark
-    }
-
-    private val glassBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = dpToPx(1).toFloat()
-        color = Color.parseColor("#45FFFFFF") // Specular border
-    }
-
-    private val liquidFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-        color = Color.parseColor("#F8FAFC") // Pure white milk glass fill
-    }
 
     private val pillRect = RectF()
     private val fillRect = RectF()
     private val clipPath = Path()
 
+    private val normalWidth = dpToPx(if (isMasterMode) 52 else prefs.sliderWidthDp).toFloat()
+    private val expandedWidth = normalWidth + dpToPx(8).toFloat()
+    private var currentWidth = normalWidth
+    private val pillHeight = dpToPx(if (isMasterMode) 160 else prefs.sliderHeightDp).toFloat()
+
+    private val glassBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.parseColor("#38121624") // High-contrast frosted tint
+    }
+
+    private val glassBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = dpToPx(1).toFloat()
+        color = Color.parseColor("#45FFFFFF") // Glowing rim
+    }
+
+    private val liquidPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.parseColor(prefs.accentColorHex)
+    }
+
+    private val percentTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = dpToPx(11).toFloat()
+        typeface = android.graphics.Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+    }
+
     private val icon: Drawable? = ContextCompat.getDrawable(context, customIconRes ?: R.drawable.ic_volume_up)
     private var maxVolume = 1
     private var animatedProgress = 0.5f
     private var progressAnimator: ValueAnimator? = null
-    private var expandAnimator: ValueAnimator? = null
+    private var widthAnimator: ValueAnimator? = null
 
     init {
         refreshVolume()
@@ -380,10 +442,10 @@ class IOSCapsuleSliderView(
     fun refreshVolume() {
         maxVolume = audioManager.getStreamMaxVolume(streamType).coerceAtLeast(1)
         val currentVol = audioManager.getStreamVolume(streamType)
-        val newProgress = currentVol.toFloat() / maxVolume.toFloat()
+        val target = (currentVol.toFloat() / maxVolume.toFloat()).coerceIn(0f, 1f)
 
         progressAnimator?.cancel()
-        progressAnimator = ValueAnimator.ofFloat(animatedProgress, newProgress.coerceIn(0f, 1f)).apply {
+        progressAnimator = ValueAnimator.ofFloat(animatedProgress, target).apply {
             duration = 140
             interpolator = OvershootInterpolator(0.9f)
             addUpdateListener { va ->
@@ -395,23 +457,23 @@ class IOSCapsuleSliderView(
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val w = (expandedWidth + dpToPx(10)).toInt()
-        val h = (pillHeight + dpToPx(10)).toInt()
+        val w = (expandedWidth + dpToPx(8)).toInt()
+        val h = (pillHeight + dpToPx(8)).toInt()
         setMeasuredDimension(w, h)
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        val left = (width - currentPillWidth) / 2f
+        val left = (width - currentWidth) / 2f
         val top = (height - pillHeight) / 2f
-        val right = left + currentPillWidth
+        val right = left + currentWidth
         val bottom = top + pillHeight
-        val radius = currentPillWidth / 2f
+        val radius = currentWidth / 2f
 
         pillRect.set(left, top, right, bottom)
 
-        // 1. Draw Outer Glass Pill Background
+        // 1. Frosted Glass Capsule Background
         canvas.drawRoundRect(pillRect, radius, radius, glassBgPaint)
 
         // 2. Liquid Fill
@@ -423,24 +485,32 @@ class IOSCapsuleSliderView(
         val fillHeight = pillHeight * animatedProgress
         val fillTop = bottom - fillHeight
         fillRect.set(left, fillTop, right, bottom)
-        canvas.drawRect(fillRect, liquidFillPaint)
+        canvas.drawRect(fillRect, liquidPaint)
 
         canvas.restore()
 
-        // 3. Glowing Glass Rim
+        // 3. Specular Border
         canvas.drawRoundRect(pillRect, radius, radius, glassBorderPaint)
 
-        // 4. Dynamic Icon (with Inversion)
+        // 4. Percentage Text (if in master mode)
+        if (isMasterMode) {
+            val percent = (animatedProgress * 100).toInt()
+            val textY = top + dpToPx(20)
+            percentTextPaint.color = if (fillTop < textY) Color.parseColor("#0F172A") else Color.WHITE
+            canvas.drawText("$percent%", pillRect.centerX(), textY.toFloat(), percentTextPaint)
+        }
+
+        // 5. Speaker / Stream Icon with Dynamic Inversion
         val ic = icon ?: return
-        val iconSize = dpToPx(24)
+        val iconSize = dpToPx(22)
         val iconX = (pillRect.centerX() - iconSize / 2f).toInt()
-        val iconY = (pillRect.bottom - dpToPx(26) - iconSize / 2f).toInt()
+        val iconY = (pillRect.bottom - dpToPx(24) - iconSize / 2f).toInt()
 
         ic.setBounds(iconX, iconY, iconX + iconSize, iconY + iconSize)
 
         val iconCenterY = iconY + iconSize / 2f
-        val isCoveredByLiquid = fillTop < iconCenterY
-        val iconColor = if (isCoveredByLiquid) Color.parseColor("#0F172A") else Color.WHITE
+        val isCovered = fillTop < iconCenterY
+        val iconColor = if (isCovered) Color.parseColor("#0F172A") else Color.WHITE
 
         DrawableCompat.setTint(ic, iconColor)
         ic.draw(canvas)
@@ -452,7 +522,7 @@ class IOSCapsuleSliderView(
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                animatePillWidth(expandedWidth)
+                animateWidth(expandedWidth)
                 handleTouch(event.y)
                 return true
             }
@@ -461,7 +531,7 @@ class IOSCapsuleSliderView(
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                animatePillWidth(normalWidth)
+                animateWidth(normalWidth)
                 return true
             }
         }
@@ -486,13 +556,13 @@ class IOSCapsuleSliderView(
         invalidate()
     }
 
-    private fun animatePillWidth(target: Float) {
-        expandAnimator?.cancel()
-        expandAnimator = ValueAnimator.ofFloat(currentPillWidth, target).apply {
-            duration = 160
+    private fun animateWidth(target: Float) {
+        widthAnimator?.cancel()
+        widthAnimator = ValueAnimator.ofFloat(currentWidth, target).apply {
+            duration = 140
             interpolator = OvershootInterpolator(1.2f)
             addUpdateListener { va ->
-                currentPillWidth = va.animatedValue as Float
+                currentWidth = va.animatedValue as Float
                 requestLayout()
                 invalidate()
             }
