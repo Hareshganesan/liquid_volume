@@ -20,7 +20,7 @@ class VolumeOverlayController(private val context: Context) {
     private val prefs = PreferencesManager(context)
     private val handler = Handler(Looper.getMainLooper())
 
-    private var sliderView: LiquidGlassSliderView? = null
+    private var overlayView: MasterVolumeOverlayView? = null
     private var isShowing = false
 
     private val dismissRunnable = Runnable { dismiss() }
@@ -28,19 +28,21 @@ class VolumeOverlayController(private val context: Context) {
     fun show(direction: Int = 0) {
         handler.removeCallbacks(dismissRunnable)
 
-        if (sliderView == null) {
-            sliderView = LiquidGlassSliderView(
+        if (overlayView == null) {
+            overlayView = MasterVolumeOverlayView(
                 context = context,
                 audioManager = audioManager,
                 prefs = prefs,
                 onInteraction = {
-                    handler.removeCallbacks(dismissRunnable)
-                    handler.postDelayed(dismissRunnable, AUTO_DISMISS_DELAY_MS)
+                    resetDismissTimer()
+                },
+                onRequestDismiss = {
+                    dismiss()
                 }
             )
         }
 
-        val slider = sliderView ?: return
+        val overlay = overlayView ?: return
 
         if (!isShowing) {
             val gravity = if (prefs.isRightSide) {
@@ -53,7 +55,7 @@ class VolumeOverlayController(private val context: Context) {
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
 
-            // Enable Native Window Blur Behind on Android 12+
+            // Native Window Blur Behind on Android 12+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 windowFlags = windowFlags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
             }
@@ -66,57 +68,57 @@ class VolumeOverlayController(private val context: Context) {
                 PixelFormat.TRANSLUCENT
             ).apply {
                 this.gravity = gravity
-                x = (8 * context.resources.displayMetrics.density).toInt()
+                x = (10 * context.resources.displayMetrics.density).toInt()
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    val blur = prefs.blurRadius.toInt().coerceIn(15, 60)
+                    val blur = prefs.blurRadius.toInt().coerceIn(20, 60)
                     setBlurBehindRadius(blur)
                 }
             }
 
             try {
-                windowManager.addView(slider, params)
+                windowManager.addView(overlay, params)
                 isShowing = true
 
-                // Premium Spring Pop-in Animation
+                // Enter animation
                 val startX = if (prefs.isRightSide) 120f else -120f
-                slider.translationX = startX
-                slider.scaleX = 0.85f
-                slider.scaleY = 0.85f
-                slider.alpha = 0f
+                overlay.translationX = startX
+                overlay.alpha = 0f
 
-                slider.animate()
+                overlay.animate()
                     .translationX(0f)
-                    .scaleX(1f)
-                    .scaleY(1f)
                     .alpha(1f)
-                    .setDuration(220)
+                    .setDuration(200)
                     .setInterpolator(OvershootInterpolator(1.1f))
                     .start()
 
             } catch (_: Exception) {}
         }
 
-        slider.updateAccentColor()
-        slider.refreshVolume()
-
         if (direction != 0) {
-            slider.adjustVolumeByStep(direction)
+            overlay.handleHardwareVolumeStep(direction)
+        } else {
+            overlay.refreshAllSliders()
         }
 
-        handler.postDelayed(dismissRunnable, AUTO_DISMISS_DELAY_MS)
+        resetDismissTimer()
+    }
+
+    private fun resetDismissTimer() {
+        handler.removeCallbacks(dismissRunnable)
+        // If user is inside Master mode, give them 5 seconds to adjust streams comfortably
+        val delay = if (overlayView?.isExpanded == true) 5000L else AUTO_DISMISS_DELAY_MS
+        handler.postDelayed(dismissRunnable, delay)
     }
 
     fun dismiss() {
         handler.removeCallbacks(dismissRunnable)
-        val slider = sliderView ?: return
+        val overlay = overlayView ?: return
 
         if (isShowing) {
             val endX = if (prefs.isRightSide) 120f else -120f
-            slider.animate()
+            overlay.animate()
                 .translationX(endX)
-                .scaleX(0.85f)
-                .scaleY(0.85f)
                 .alpha(0f)
                 .setDuration(160)
                 .setInterpolator(DecelerateInterpolator())
@@ -124,11 +126,11 @@ class VolumeOverlayController(private val context: Context) {
                     override fun onAnimationEnd(animation: Animator) {
                         try {
                             if (isShowing) {
-                                windowManager.removeView(slider)
+                                windowManager.removeView(overlay)
                                 isShowing = false
                             }
                         } catch (_: Exception) {}
-                        slider.animate().setListener(null)
+                        overlay.animate().setListener(null)
                     }
                 })
                 .start()
