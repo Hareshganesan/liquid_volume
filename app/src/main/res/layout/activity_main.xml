@@ -201,7 +201,7 @@
                     android:id="@+id/tvVerticalOffsetLabel"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Vertical Position (Align with Rocker): 42%"
+                    android:text="Vertical Position: 42%"
                     android:textColor="@color/text_primary"
                     android:textSize="15sp"
                     android:textStyle="bold" />
@@ -218,10 +218,10 @@
                     android:id="@+id/sliderVerticalOffset"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:value="42"
-                    android:valueFrom="10"
-                    android:valueTo="90"
-                    android:stepSize="1" />
+                    app:value="42.0"
+                    app:valueFrom="10.0"
+                    app:valueTo="90.0"
+                    app:stepSize="1.0" />
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -266,10 +266,10 @@
                     android:id="@+id/sliderLength"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:value="180"
-                    android:valueFrom="130"
-                    android:valueTo="240"
-                    android:stepSize="5" />
+                    app:value="180.0"
+                    app:valueFrom="130.0"
+                    app:valueTo="240.0"
+                    app:stepSize="5.0" />
 
                 <View
                     android:layout_width="match_parent"
@@ -291,10 +291,10 @@
                     android:id="@+id/sliderWidth"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:value="46"
-                    android:valueFrom="36"
-                    android:valueTo="56"
-                    android:stepSize="2" />
+                    app:value="46.0"
+                    app:valueFrom="36.0"
+                    app:valueTo="56.0"
+                    app:stepSize="2.0" />
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -347,10 +347,10 @@
                     android:id="@+id/sliderTimeout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:value="2.5"
-                    android:valueFrom="1.0"
-                    android:valueTo="6.0"
-                    android:stepSize="0.5" />
+                    app:value="2.5"
+                    app:valueFrom="1.0"
+                    app:valueTo="6.0"
+                    app:stepSize="0.5" />
 
                 <View
                     android:layout_width="match_parent"
@@ -372,10 +372,10 @@
                     android:id="@+id/sliderBlur"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:value="40"
-                    android:valueFrom="15"
-                    android:valueTo="60"
-                    android:stepSize="5" />
+                    app:value="40.0"
+                    app:valueFrom="15.0"
+                    app:valueTo="60.0"
+                    app:stepSize="5.0" />
 
                 <View
                     android:layout_width="match_parent"
