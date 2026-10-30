@@ -8,10 +8,19 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.antigravity.volumepanel.databinding.ActivityMainBinding
 
+/**
+ * Liquid Volume Settings & Customization Dashboard
+ *
+ * Fully compliant with Google Play Store Policies:
+ * - Prominent In-App User Disclosure for Accessibility Service API prior to navigation.
+ * - SYSTEM_ALERT_WINDOW guidance.
+ * - Dynamic live-tuning of position, thickness, height, timeout, and accent color.
+ */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
@@ -94,7 +103,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
-        // Permissions
+        // Permissions: Overlay
         binding.btnGrantOverlay.setOnClickListener {
             val intent = Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -103,9 +112,9 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
+        // Permissions: Accessibility with Google Play Prominent Disclosure Dialog
         binding.btnGrantAccessibility.setOnClickListener {
-            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-            startActivity(intent)
+            showAccessibilityDisclosureDialog()
         }
 
         // Side Change
@@ -170,6 +179,18 @@ class MainActivity : AppCompatActivity() {
                 localOverlayController?.show(0)
             }
         }
+    }
+
+    private fun showAccessibilityDisclosureDialog() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.accessibility_dialog_title)
+            .setMessage(R.string.accessibility_dialog_message)
+            .setPositiveButton(R.string.dialog_continue) { _, _ ->
+                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                startActivity(intent)
+            }
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .show()
     }
 
     private fun updatePermissionStates() {

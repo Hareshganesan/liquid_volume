@@ -1,12 +1,20 @@
 <resources>
     <string name="app_name">Liquid Volume</string>
-    <string name="accessibility_service_description">Enables custom frosted glass volume panel and handles volume button events smoothly.</string>
+    <string name="accessibility_service_description">Liquid Volume uses the AccessibilityService API exclusively to detect physical volume up/down key presses and display your custom liquid glass volume slider instead of the system volume dialog. It never monitors, collects, stores, or transmits any keystrokes, personal data, or screen content.</string>
+    
     <string name="permission_overlay_title">1. Draw Over Apps</string>
-    <string name="permission_overlay_desc">Required to display the custom volume slider floating over your screen.</string>
+    <string name="permission_overlay_desc">Required to display the floating liquid glass volume slider smoothly over your screen.</string>
     <string name="permission_accessibility_title">2. Accessibility Service</string>
-    <string name="permission_accessibility_desc">Required to intercept volume up/down buttons and hide the default system UI.</string>
+    <string name="permission_accessibility_desc">Required to detect physical volume button presses and seamlessly replace the stock system dialog.</string>
     <string name="grant_permission">Grant Permission</string>
     <string name="granted">Granted ✓</string>
+    
+    <!-- Prominent Disclosure Dialog (Google Play Policy Compliance) -->
+    <string name="accessibility_dialog_title">Accessibility Permission Disclosure</string>
+    <string name="accessibility_dialog_message">Liquid Volume requires Accessibility Service access solely to intercept physical volume key presses (Volume Up and Volume Down).\n\n• Purpose: Detect hardware volume button presses to present the custom fluid volume interface.\n• Privacy: Liquid Volume does NOT inspect screen content, record keystrokes, or collect, store, or transmit any user data.</string>
+    <string name="dialog_continue">Continue to Settings</string>
+    <string name="dialog_cancel">Cancel</string>
+
     <string name="preferences_title">Customization</string>
     <string name="side_title">Slider Position</string>
     <string name="side_right">Right Side</string>

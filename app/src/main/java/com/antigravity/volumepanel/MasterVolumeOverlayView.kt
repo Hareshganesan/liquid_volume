@@ -10,6 +10,7 @@ import android.media.AudioManager
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -26,7 +27,8 @@ import androidx.core.content.ContextCompat
  * Architecture & Features:
  * - Coordinates Compact Volume Slider and Expanded Master Audio Control Center.
  * - Hardware GPU Frosted Glass styling without blue/purple casts.
- * - Back button interception when expanded.
+ * - Minimal, authentic iOS design language: zero marketing copy, pure functional controls.
+ * - Physical Back button interception when expanded.
  * - Real-time synchronization for 4 independent audio streams.
  * - 3-Way Segmented Ringer mode switcher (Silent, Vibrate, Ring).
  * - Real-time active output device detection (Phone Speaker / Bluetooth / Wired).
@@ -116,7 +118,7 @@ class MasterVolumeOverlayView(
         }
         compactRoot.layoutParams = containerParams
 
-        // 3-Dots Expand Button (Apple Frosted Glass Orb)
+        // 3-Dots Expand Button (Minimalist Apple Frosted Glass Orb)
         val dotSize = dpToPx(34)
         val dotParams = LayoutParams(dotSize, dotSize).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
@@ -155,100 +157,40 @@ class MasterVolumeOverlayView(
             gravity = Gravity.CENTER
         }
         masterCard.orientation = LinearLayout.VERTICAL
-        masterCard.setPadding(dpToPx(26), dpToPx(24), dpToPx(26), dpToPx(24))
+        masterCard.setPadding(dpToPx(24), dpToPx(22), dpToPx(24), dpToPx(22))
 
-        // True Liquid Frosted Glass (Translucent, NO dark blue tint!)
+        // True Liquid Frosted Glass: Pure translucent neutral obsidian glass (NO dark blue tint!)
         val cardBg = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = dpToPx(LiquidGlassTokens.CORNER_RADIUS_MASTER_CARD_DP).toFloat()
             setColor(LiquidGlassTokens.COLOR_GLASS_BASE)
-            setStroke(dpToPx(LiquidGlassTokens.SPECULAR_BORDER_WIDTH_DP), Color.parseColor("#55FFFFFF"))
+            setStroke(dpToPx(LiquidGlassTokens.SPECULAR_BORDER_WIDTH_DP), Color.parseColor("#44FFFFFF"))
         }
         masterCard.background = cardBg
         masterCard.elevation = dpToPx(24).toFloat()
 
-        // 1. Header (Badge + Title + Close Button)
+        // 1. Clean Minimal Header: Active Output Route Pill + Close Button (No Marketing Copy)
         val header = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         }
 
-        // Audio Icon Frosted Badge
-        val iconBadge = ImageView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(dpToPx(38), dpToPx(38)).apply {
-                marginEnd = dpToPx(12)
-            }
-            setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_volume_up))
-            setColorFilter(Color.parseColor(prefs.accentColorHex))
-            val badgeBg = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#26FFFFFF"))
-                setStroke(dpToPx(1), Color.parseColor("#40FFFFFF"))
-            }
-            background = badgeBg
-            setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
-        }
-
-        val titleCol = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-
-        val tvTitle = TextView(context).apply {
-            text = "Audio Control Center"
-            setTextColor(Color.WHITE)
-            textSize = 18.5f
-            typeface = Typeface.DEFAULT_BOLD
-            letterSpacing = -0.01f
-        }
-        val tvSub = TextView(context).apply {
-            text = "ColorOS 16 · iOS 18 Liquid Glass"
-            setTextColor(Color.parseColor("#CBD5E1"))
-            textSize = 12f
-        }
-        titleCol.addView(tvTitle)
-        titleCol.addView(tvSub)
-
-        // Apple Style Circular Close Button
-        val btnClose = ImageView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(dpToPx(32), dpToPx(32))
-            setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_close))
-            setColorFilter(Color.WHITE)
-            val closeBg = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#2EFFFFFF"))
-                setStroke(dpToPx(1), Color.parseColor("#40FFFFFF"))
-            }
-            background = closeBg
-            setPadding(dpToPx(7), dpToPx(7), dpToPx(7), dpToPx(7))
-            setOnClickListener {
-                vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
-                onInteractionStart()
-                onRequestCollapse()
-            }
-        }
-
-        header.addView(iconBadge)
-        header.addView(titleCol)
-        header.addView(btnClose)
-        masterCard.addView(header)
-
-        // 2. Output Device Indicator Pill (Translucent Glass)
+        // Output Device Pill
         val deviceBanner = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(34)).apply {
-                topMargin = dpToPx(14)
+            layoutParams = LinearLayout.LayoutParams(0, dpToPx(36), 1f).apply {
+                marginEnd = dpToPx(14)
             }
             val bannerBg = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = dpToPx(12).toFloat()
-                setColor(Color.parseColor("#20FFFFFF"))
-                setStroke(dpToPx(1), Color.parseColor("#25FFFFFF"))
+                cornerRadius = dpToPx(18).toFloat()
+                setColor(Color.parseColor("#22FFFFFF"))
+                setStroke(dpToPx(1), Color.parseColor("#30FFFFFF"))
             }
             background = bannerBg
-            setPadding(dpToPx(10), dpToPx(4), dpToPx(10), dpToPx(4))
+            setPadding(dpToPx(12), dpToPx(6), dpToPx(12), dpToPx(6))
         }
 
         val devIcon = ImageView(context).apply {
@@ -256,22 +198,22 @@ class MasterVolumeOverlayView(
                 marginEnd = dpToPx(8)
             }
             setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_output_speaker))
-            setColorFilter(Color.parseColor("#38BDF8"))
+            setColorFilter(Color.parseColor(prefs.accentColorHex))
         }
 
         tvOutputDevice.apply {
             text = getActiveOutputDeviceText()
-            setTextColor(Color.parseColor("#F1F5F9"))
-            textSize = 12.5f
+            setTextColor(Color.parseColor("#F8FAFC"))
+            textSize = 13f
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
         val dotActive = View(context).apply {
-            layoutParams = LinearLayout.LayoutParams(dpToPx(6), dpToPx(6))
+            layoutParams = LinearLayout.LayoutParams(dpToPx(7), dpToPx(7))
             val dotBg = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#22C55E"))
+                setColor(Color.parseColor("#22C55E")) // Active connection indicator
             }
             background = dotBg
         }
@@ -279,9 +221,30 @@ class MasterVolumeOverlayView(
         deviceBanner.addView(devIcon)
         deviceBanner.addView(tvOutputDevice)
         deviceBanner.addView(dotActive)
-        masterCard.addView(deviceBanner)
+        header.addView(deviceBanner)
 
-        // 3. Sliders Row
+        // Apple Style Circular Close Button
+        val btnClose = ImageView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(dpToPx(34), dpToPx(34))
+            setImageDrawable(ContextCompat.getDrawable(context, R.drawable.ic_close))
+            setColorFilter(Color.WHITE)
+            val closeBg = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#2AFFFFFF"))
+                setStroke(dpToPx(1), Color.parseColor("#38FFFFFF"))
+            }
+            background = closeBg
+            setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
+            setOnClickListener {
+                vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+                onInteractionStart()
+                onRequestCollapse()
+            }
+        }
+        header.addView(btnClose)
+        masterCard.addView(header)
+
+        // 2. 4-Stream Sliders Row
         slidersContainer.orientation = LinearLayout.HORIZONTAL
         slidersContainer.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
             topMargin = dpToPx(20)
@@ -290,7 +253,7 @@ class MasterVolumeOverlayView(
 
         val streams = listOf(
             Triple("Media", AudioManager.STREAM_MUSIC, R.drawable.ic_volume_up),
-            Triple("Ringtone", AudioManager.STREAM_RING, R.drawable.ic_bell),
+            Triple("Ring", AudioManager.STREAM_RING, R.drawable.ic_bell),
             Triple("Alerts", AudioManager.STREAM_NOTIFICATION, R.drawable.ic_notifications),
             Triple("Alarm", AudioManager.STREAM_ALARM, R.drawable.ic_alarm)
         )
@@ -310,7 +273,7 @@ class MasterVolumeOverlayView(
                 }
             }
 
-            // Floating Percentage Text above Slider
+            // Percentage Text above Slider
             val tvPercent = TextView(context).apply {
                 text = "0%"
                 setTextColor(Color.parseColor("#CBD5E1"))
@@ -344,7 +307,7 @@ class MasterVolumeOverlayView(
             }
             masterSliders.add(slider)
 
-            // Label underneath
+            // Stream Label underneath
             val tvLabel = TextView(context).apply {
                 text = label
                 setTextColor(Color.parseColor("#F8FAFC"))
@@ -360,7 +323,7 @@ class MasterVolumeOverlayView(
         }
         masterCard.addView(slidersContainer)
 
-        // 4. Sound Mode Segmented Switch
+        // 3. Sound Mode Segmented Switch (Silent, Vibrate, Ring)
         setupSegmentedSoundBar()
         masterCard.addView(soundModeSegmented)
 
@@ -375,23 +338,23 @@ class MasterVolumeOverlayView(
                 for (d in devices) {
                     when (d.type) {
                         AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> {
-                            val name = d.productName?.toString()?.takeIf { it.isNotBlank() } ?: "Bluetooth Device"
+                            val name = d.productName?.toString()?.takeIf { it.isNotBlank() } ?: "Bluetooth"
                             return "$name · Wireless"
                         }
                         AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_USB_HEADSET -> {
-                            return "Headphones · Hi-Res Audio"
+                            return "Headphones · Hi-Res"
                         }
                     }
                 }
             } catch (_: Exception) {}
         }
-        return "Phone Speaker · Spatial Audio"
+        return "Phone Speaker"
     }
 
     private fun setupSegmentedSoundBar() {
         soundModeSegmented.removeAllViews()
         soundModeSegmented.orientation = LinearLayout.HORIZONTAL
-        soundModeSegmented.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(46)).apply {
+        soundModeSegmented.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(44)).apply {
             topMargin = dpToPx(4)
         }
 
@@ -434,7 +397,7 @@ class MasterVolumeOverlayView(
                 }
 
                 val icon = ImageView(context).apply {
-                    layoutParams = LinearLayout.LayoutParams(dpToPx(16), dpToPx(16)).apply {
+                    layoutParams = LinearLayout.LayoutParams(dpToPx(15), dpToPx(15)).apply {
                         marginEnd = dpToPx(6)
                     }
                     setImageDrawable(ContextCompat.getDrawable(context, iconRes))
@@ -443,7 +406,7 @@ class MasterVolumeOverlayView(
 
                 val label = TextView(context).apply {
                     text = name
-                    textSize = 13f
+                    textSize = 12.5f
                     setTextColor(if (isSelected) LiquidGlassTokens.COLOR_TEXT_DARK_INVERTED else Color.WHITE)
                     typeface = Typeface.DEFAULT_BOLD
                 }
@@ -456,7 +419,9 @@ class MasterVolumeOverlayView(
                     onInteractionStart()
                     try {
                         audioManager.ringerMode = mode
-                    } catch (_: Exception) {}
+                    } catch (e: Exception) {
+                        Log.w("LiquidVolume", "Failed to change ringerMode to $mode: ${e.message}")
+                    }
                     setupSegmentedSoundBar()
                     refreshAll()
                 }
@@ -483,8 +448,8 @@ class MasterVolumeOverlayView(
         masterCard.visibility = View.VISIBLE
         tvOutputDevice.text = getActiveOutputDeviceText()
 
-        masterCard.scaleX = 0.80f
-        masterCard.scaleY = 0.80f
+        masterCard.scaleX = 0.82f
+        masterCard.scaleY = 0.82f
         masterCard.alpha = 0f
 
         masterCard.animate()
@@ -531,6 +496,7 @@ class MasterVolumeOverlayView(
     fun updateActiveStream() {
         val activeStream = when {
             audioManager.mode == AudioManager.MODE_IN_CALL || audioManager.mode == AudioManager.MODE_IN_COMMUNICATION -> AudioManager.STREAM_VOICE_CALL
+            audioManager.mode == AudioManager.MODE_RINGTONE -> AudioManager.STREAM_RING
             audioManager.isMusicActive -> AudioManager.STREAM_MUSIC
             else -> AudioManager.STREAM_MUSIC
         }
@@ -538,7 +504,11 @@ class MasterVolumeOverlayView(
     }
 
     fun handleHardwareKeyStep(direction: Int) {
-        audioManager.adjustSuggestedStreamVolume(direction, AudioManager.USE_DEFAULT_STREAM_TYPE, 0)
+        try {
+            audioManager.adjustSuggestedStreamVolume(direction, AudioManager.USE_DEFAULT_STREAM_TYPE, 0)
+        } catch (e: Exception) {
+            Log.w("LiquidVolume", "adjustSuggestedStreamVolume error: ${e.message}")
+        }
         vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
 
         if (isExpanded) {
@@ -550,11 +520,11 @@ class MasterVolumeOverlayView(
 
     fun onExternalVolumeChange(streamType: Int, volume: Int) {
         if (compactSlider.streamType == streamType) {
-            compactSlider.refreshVolume()
+            compactSlider.refreshVolume(volume)
         }
         for (s in masterSliders) {
             if (s.streamType == streamType) {
-                s.refreshVolume()
+                s.refreshVolume(volume)
             }
         }
     }

@@ -13,8 +13,11 @@ import android.graphics.Shader
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.media.AudioManager
+import android.os.Build
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import androidx.core.content.ContextCompat
@@ -27,12 +30,13 @@ import kotlin.math.roundToInt
  *
  * Performance & Architecture:
  * - Zero heap allocations inside onDraw() for sustained 120 FPS rendering.
- * - LinearGradient shaders generated exclusively in onSizeChanged().
- * - Vector drawables pre-cached in memory.
- * - Direct finger-to-volume tracking with zero layout thrashing.
+ * - Dynamic minVolume (API 28+) to maxVolume mapping with discrete step quantization.
+ * - Direct finger-to-volume tracking with audio stream synchronization.
+ * - Delayed broadcast debounce window (600ms) to eliminate post-drag snapping/bouncing.
+ * - Safe swipe-to-dismiss vector calculation (differentiates vertical drag from bezel swipe).
  * - Dual-pass canvas clipping for authentic Apple two-tone split inversion.
  * - Fluid elastic width spring (+10dp) on finger touch.
- * - Safe AudioManager integration with audible feedback and SecurityException fallbacks.
+ * - Targeted debug logging for ADB logcat verification.
  */
 @SuppressLint("ViewConstructor")
 class IOSControlSlider(
@@ -94,49 +98,99 @@ class IOSControlSlider(
     private val iconCustom: Drawable? = customIconRes?.let { ContextCompat.getDrawable(context, it)?.mutate() }
 
     // State Variables
-    private var maxVolume = 1
+    private var minVolume = 0
+    private var maxVolume = 15
+    private var currentSystemVolume = 0
     private var animatedProgress = 0.5f
     private var progressAnimator: ValueAnimator? = null
     private var widthAnimator: ValueAnimator? = null
 
     var isDragging = false
         private set
+    private var lastUserInteractionTime = 0L
+    private var lastSettledVolume = -1
     private var touchDownX = 0f
     private var touchDownY = 0f
     private var hasMovedVertically = false
     private var lastNonZeroVolume: Int = 1
 
     init {
-        refreshVolume()
+        updateBounds()
+        refreshVolume(immediate = true)
+    }
+
+    private fun updateBounds() {
+        minVolume = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            try { audioManager.getStreamMinVolume(streamType) } catch (_: Exception) { 0 }
+        } else {
+            0
+        }
+        maxVolume = try {
+            audioManager.getStreamMaxVolume(streamType).coerceAtLeast(minVolume + 1)
+        } catch (_: Exception) {
+            15
+        }
     }
 
     fun updateStreamType(newStreamType: Int) {
         if (streamType != newStreamType) {
+            Log.d("LiquidVolume", "Slider changing streamType from $streamType to $newStreamType")
             streamType = newStreamType
-            refreshVolume()
+            updateBounds()
+            refreshVolume(immediate = true)
         }
     }
 
-    fun refreshVolume() {
-        if (isDragging) return // Don't interrupt active finger interaction
-
-        maxVolume = audioManager.getStreamMaxVolume(streamType).coerceAtLeast(1)
-        val currentVol = audioManager.getStreamVolume(streamType)
-        if (currentVol > 0) {
-            lastNonZeroVolume = currentVol
+    fun refreshVolume(externalValue: Int? = null, immediate: Boolean = false) {
+        if (isDragging) {
+            Log.d("LiquidVolume", "refreshVolume ignored: user actively dragging slider")
+            return
         }
-        val target = (currentVol.toFloat() / maxVolume.toFloat()).coerceIn(0f, 1f)
+
+        // Debounce external broadcasts within 600ms of user touch release to prevent post-drag bouncing
+        val now = SystemClock.uptimeMillis()
+        if (!immediate && (now - lastUserInteractionTime) < 600L) {
+            Log.d("LiquidVolume", "refreshVolume debounced: recent user drag (${now - lastUserInteractionTime}ms ago)")
+            if (externalValue != null && externalValue > 0) {
+                lastNonZeroVolume = externalValue
+                currentSystemVolume = externalValue
+            }
+            return
+        }
+
+        updateBounds()
+        val curVol = externalValue ?: try {
+            audioManager.getStreamVolume(streamType)
+        } catch (_: Exception) {
+            currentSystemVolume
+        }
+        currentSystemVolume = curVol
+
+        if (curVol > 0) {
+            lastNonZeroVolume = curVol
+        }
+
+        val range = (maxVolume - minVolume).coerceAtLeast(1)
+        val targetProgress = ((curVol - minVolume).toFloat() / range.toFloat()).coerceIn(0f, 1f)
+
+        Log.d("LiquidVolume", "refreshVolume: stream=$streamType, vol=$curVol, min=$minVolume, max=$maxVolume, targetProgress=${String.format("%.2f", targetProgress)}")
 
         progressAnimator?.cancel()
-        progressAnimator = ValueAnimator.ofFloat(animatedProgress, target).apply {
-            duration = LiquidGlassTokens.DURATION_VOLUME_ANIM_MS
-            interpolator = LiquidGlassTokens.INTERPOLATOR_APPLE_SPRING
-            addUpdateListener { va ->
-                animatedProgress = va.animatedValue as Float
-                onVolumeChanged?.invoke((animatedProgress * 100).toInt())
-                invalidate()
+        if (immediate) {
+            animatedProgress = targetProgress
+            onVolumeChanged?.invoke((animatedProgress * 100).toInt())
+            invalidate()
+        } else {
+            progressAnimator = ValueAnimator.ofFloat(animatedProgress, targetProgress).apply {
+                duration = LiquidGlassTokens.DURATION_VOLUME_ANIM_MS
+                interpolator = LiquidGlassTokens.INTERPOLATOR_APPLE_SPRING
+                addUpdateListener { va ->
+                    animatedProgress = va.animatedValue as Float
+                    onVolumeChanged?.invoke((animatedProgress * 100).toInt())
+                    invalidate()
+                }
+                start()
             }
-            start()
         }
     }
 
@@ -184,7 +238,7 @@ class IOSControlSlider(
 
         pillRect.set(left, top, right, bottom)
 
-        // 1. Translucent Frosted Glass Capsule (No dark blue, clean optical glass)
+        // 1. Translucent Frosted Glass Capsule (Clean neutral optical glass)
         canvas.drawRoundRect(pillRect, radius, radius, glassBgPaint)
 
         // 2. Liquid Fill with Rounded Clipping
@@ -215,7 +269,7 @@ class IOSControlSlider(
             val textY = top + dpToPx(24)
             val textStr = if (percent == 0) "OFF" else "$percent%"
 
-            // Pass A: Unfilled area above water (Pure White)
+            // Pass A: Unfilled area above liquid (Crisp Pure White)
             canvas.save()
             canvas.clipRect(left, top, right, fillTop)
             percentTextPaint.color = LiquidGlassTokens.COLOR_TEXT_LIGHT
@@ -237,7 +291,7 @@ class IOSControlSlider(
         val iconY = (pillRect.bottom - dpToPx(25) - iconSize / 2f).toInt()
         ic.setBounds(iconX, iconY, iconX + iconSize, iconY + iconSize)
 
-        // Pass A: Above Water (Pure White)
+        // Pass A: Above Liquid (Crisp Pure White)
         canvas.save()
         canvas.clipRect(left, top, right, fillTop)
         DrawableCompat.setTint(ic, LiquidGlassTokens.COLOR_TEXT_LIGHT)
@@ -263,8 +317,9 @@ class IOSControlSlider(
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 parent?.requestDisallowInterceptTouchEvent(true)
-                progressAnimator?.cancel() // Cancel running auto-animation immediately so user finger has full priority
+                progressAnimator?.cancel()
                 isDragging = true
+                lastUserInteractionTime = SystemClock.uptimeMillis()
                 onInteractionStart()
 
                 touchDownX = event.x
@@ -278,18 +333,22 @@ class IOSControlSlider(
 
             MotionEvent.ACTION_MOVE -> {
                 parent?.requestDisallowInterceptTouchEvent(true)
+                lastUserInteractionTime = SystemClock.uptimeMillis()
+
                 val dx = event.x - touchDownX
                 val dy = event.y - touchDownY
 
-                if (abs(dy) > dpToPx(3)) {
+                if (abs(dy) > dpToPx(5)) {
                     hasMovedVertically = true
                 }
 
-                // Smooth Swipe-to-Dismiss on Compact Slider
+                // Precision Swipe-to-Dismiss on Compact Slider:
+                // Only triggers if horizontal motion strongly dominates vertical drag (abs(dx) > abs(dy) * 1.6)
                 if (!isMasterMode) {
-                    val swipeThreshold = dpToPx(38)
-                    val swipedOff = if (prefs.isRightSide) dx > swipeThreshold else dx < -swipeThreshold
-                    if (swipedOff) {
+                    val swipeThreshold = dpToPx(45)
+                    val swipedTowardsBezel = if (prefs.isRightSide) dx > swipeThreshold else dx < -swipeThreshold
+                    if (swipedTowardsBezel && abs(dx) > abs(dy) * 1.6f) {
+                        Log.d("LiquidVolume", "Compact slider bezel swipe dismiss triggered: dx=$dx, dy=$dy")
                         isDragging = false
                         onInteractionEnd()
                         animateWidth(normalWidth)
@@ -304,9 +363,13 @@ class IOSControlSlider(
 
             MotionEvent.ACTION_UP -> {
                 parent?.requestDisallowInterceptTouchEvent(false)
+                lastUserInteractionTime = SystemClock.uptimeMillis()
                 isDragging = false
                 onInteractionEnd()
                 animateWidth(normalWidth)
+
+                // Commit the final touch coordinate
+                handleTouch(event.y)
 
                 // Tap on bottom icon area toggles Mute/Restore
                 val iconTouchArea = pillHeight * 0.35f
@@ -322,6 +385,7 @@ class IOSControlSlider(
 
             MotionEvent.ACTION_CANCEL -> {
                 parent?.requestDisallowInterceptTouchEvent(false)
+                lastUserInteractionTime = SystemClock.uptimeMillis()
                 isDragging = false
                 onInteractionEnd()
                 animateWidth(normalWidth)
@@ -336,27 +400,32 @@ class IOSControlSlider(
         val bottom = top + pillHeight
         val clampedY = touchY.coerceIn(top, bottom)
 
-        // 120 FPS instantaneous finger-to-volume calculation
+        // Normalized progress: 0.0f at bottom, 1.0f at top
         val progress = (1f - ((clampedY - top) / pillHeight)).coerceIn(0f, 1f)
-        maxVolume = audioManager.getStreamMaxVolume(streamType).coerceAtLeast(1)
-        val newVol = (progress * maxVolume).roundToInt().coerceIn(0, maxVolume)
 
-        val currentVol = audioManager.getStreamVolume(streamType)
-        if (newVol != currentVol) {
+        updateBounds()
+        val range = (maxVolume - minVolume).coerceAtLeast(1)
+        val targetVol = (minVolume + (progress * range)).roundToInt().coerceIn(minVolume, maxVolume)
+
+        if (targetVol != currentSystemVolume || targetVol != lastSettledVolume) {
+            lastSettledVolume = targetVol
+            currentSystemVolume = targetVol
+
+            Log.d("LiquidVolume", "Applying Volume: stream=$streamType, targetVol=$targetVol/$maxVolume (min=$minVolume, progress=${String.format("%.2f", progress)})")
+
             try {
-                audioManager.setStreamVolume(streamType, newVol, AudioManager.FLAG_PLAY_SOUND)
-            } catch (_: Exception) {
-                try {
-                    audioManager.setStreamVolume(streamType, newVol, 0)
-                } catch (_: Exception) {}
+                // Flag 0 during rapid dragging ensures instant execution without audio buffer stalls
+                audioManager.setStreamVolume(streamType, targetVol, 0)
+            } catch (e: Exception) {
+                Log.w("LiquidVolume", "setStreamVolume failed for stream $streamType: ${e.message}")
             }
 
-            if (newVol > 0) {
-                lastNonZeroVolume = newVol
+            if (targetVol > 0) {
+                lastNonZeroVolume = targetVol
             }
 
             // Tactile Haptic Feedback
-            if (newVol == 0 || newVol == maxVolume) {
+            if (targetVol == minVolume || targetVol == maxVolume) {
                 vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
             } else {
                 vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
@@ -369,24 +438,27 @@ class IOSControlSlider(
     }
 
     private fun toggleMute() {
-        val currentVol = audioManager.getStreamVolume(streamType)
-        if (currentVol > 0) {
-            lastNonZeroVolume = currentVol
+        updateBounds()
+        val curVol = try { audioManager.getStreamVolume(streamType) } catch (_: Exception) { currentSystemVolume }
+        if (curVol > minVolume) {
+            lastNonZeroVolume = curVol
             try {
-                audioManager.setStreamVolume(streamType, 0, AudioManager.FLAG_PLAY_SOUND)
-            } catch (_: Exception) {
-                try { audioManager.setStreamVolume(streamType, 0, 0) } catch (_: Exception) {}
+                audioManager.setStreamVolume(streamType, minVolume, 0)
+                currentSystemVolume = minVolume
+            } catch (e: Exception) {
+                Log.w("LiquidVolume", "Mute toggle failed: ${e.message}")
             }
         } else {
-            val restoreVol = if (lastNonZeroVolume > 0) lastNonZeroVolume else (maxVolume / 2).coerceAtLeast(1)
+            val restoreVol = if (lastNonZeroVolume > minVolume) lastNonZeroVolume else ((maxVolume + minVolume) / 2).coerceAtLeast(minVolume + 1)
             try {
-                audioManager.setStreamVolume(streamType, restoreVol, AudioManager.FLAG_PLAY_SOUND)
-            } catch (_: Exception) {
-                try { audioManager.setStreamVolume(streamType, restoreVol, 0) } catch (_: Exception) {}
+                audioManager.setStreamVolume(streamType, restoreVol, 0)
+                currentSystemVolume = restoreVol
+            } catch (e: Exception) {
+                Log.w("LiquidVolume", "Unmute restore failed: ${e.message}")
             }
         }
         vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
-        refreshVolume()
+        refreshVolume(immediate = false)
     }
 
     private fun animateWidth(target: Float) {

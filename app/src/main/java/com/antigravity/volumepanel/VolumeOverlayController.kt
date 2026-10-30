@@ -11,6 +11,7 @@ import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
 
@@ -18,12 +19,13 @@ import android.view.WindowManager
  * Production-Quality WindowManager & Lifecycle Orchestrator
  *
  * Responsibilities:
- * - Formal OverlayState machine to prevent transition collisions and stale views.
+ * - Formal OverlayState machine to eliminate race conditions and collision glitches.
  * - Dynamic WindowManager layout re-targeting (Compact Edge ➔ Master Center Modal).
  * - System Volume BroadcastReceiver (android.media.VOLUME_CHANGED_ACTION) for real-time external synchronization.
- * - Focus arbitration (Pass-through focus in Compact; Back-button capture in Master).
- * - True hardware blur support (FLAG_BLUR_BEHIND) with graceful fallback.
- * - Apple fluid spring animations for entrance, collapse, and dismissal.
+ * - Dynamic active stream re-binding on hardware events.
+ * - Focus arbitration (Pass-through touch in Compact; Back-button capture in Master).
+ * - True hardware blur support (FLAG_BLUR_BEHIND) on API 31+ with safe bounds.
+ * - Apple fluid spring animations for entrance, collapse, and bezel-anchored dismissal.
  */
 class VolumeOverlayController(private val context: Context) {
 
@@ -45,8 +47,18 @@ class VolumeOverlayController(private val context: Context) {
             if (intent?.action == "android.media.VOLUME_CHANGED_ACTION") {
                 val streamType = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", -1)
                 val streamValue = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_VALUE", -1)
+
+                Log.d("LiquidVolume", "VOLUME_CHANGED_ACTION received: streamType=$streamType, streamValue=$streamValue")
+
                 if (streamType != -1 && streamValue != -1) {
-                    overlayView?.onExternalVolumeChange(streamType, streamValue)
+                    val overlay = overlayView
+                    if (overlay != null && !overlay.isExpanded) {
+                        // Dynamically bind compact slider to the active stream changed by Android OS
+                        if (overlay.compactSlider.streamType != streamType) {
+                            overlay.compactSlider.updateStreamType(streamType)
+                        }
+                    }
+                    overlay?.onExternalVolumeChange(streamType, streamValue)
                 }
             }
         }
@@ -82,7 +94,15 @@ class VolumeOverlayController(private val context: Context) {
 
         val overlay = overlayView ?: return
 
-        if (!currentState.isVisible) {
+        // If the view was in the middle of dismissing, cancel the exit and restore visibility immediately
+        if (currentState is OverlayState.Dismissing) {
+            overlay.animate().cancel()
+            overlay.alpha = 1f
+            overlay.scaleX = 1f
+            overlay.scaleY = 1f
+            overlay.translationX = 0f
+            transitionTo(OverlayState.CompactVisible)
+        } else if (!currentState.isVisible) {
             registerVolumeReceiver()
             val params = createCompactLayoutParams()
 
@@ -90,10 +110,11 @@ class VolumeOverlayController(private val context: Context) {
                 windowManager.addView(overlay, params)
                 transitionTo(OverlayState.CompactEntering)
 
-                // Apple Fluid Spring Entrance
                 val density = context.resources.displayMetrics.density
                 val startTranslationX = if (prefs.isRightSide) 55f * density else -55f * density
 
+                overlay.pivotX = if (prefs.isRightSide) overlay.width.toFloat() else 0f
+                overlay.pivotY = overlay.height / 2f
                 overlay.translationX = startTranslationX
                 overlay.scaleX = 0.85f
                 overlay.scaleY = 0.85f
@@ -116,7 +137,9 @@ class VolumeOverlayController(private val context: Context) {
                     })
                     .start()
 
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.w("LiquidVolume", "Failed to add overlay window: ${e.message}")
+            }
         }
 
         overlay.updateActiveStream()
@@ -191,7 +214,7 @@ class VolumeOverlayController(private val context: Context) {
             this.x = (8 * density).toInt()
             this.y = targetY
 
-            // Prevent cutout clipping on AMOLED punch-hole displays (OPPO K13)
+            // Prevent cutout clipping on AMOLED displays (OPPO K13)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
             }
@@ -253,15 +276,19 @@ class VolumeOverlayController(private val context: Context) {
                 }
             } else {
                 val density = context.resources.displayMetrics.density
-                val endTranslationX = if (prefs.isRightSide) 50f * density else -50f * density
+                val endTranslationX = if (prefs.isRightSide) 42f * density else -42f * density
+
+                // Anchor scale pivot to the physical bezel edge
+                overlay.pivotX = if (prefs.isRightSide) overlay.width.toFloat() else 0f
+                overlay.pivotY = overlay.height / 2f
 
                 overlay.animate()
                     .translationX(endTranslationX)
-                    .scaleX(0.85f)
+                    .scaleX(0.65f)
                     .scaleY(0.85f)
                     .alpha(0f)
                     .setDuration(LiquidGlassTokens.DURATION_COMPACT_EXIT_MS)
-                    .setInterpolator(LiquidGlassTokens.INTERPOLATOR_SMOOTH_EXIT)
+                    .setInterpolator(LiquidGlassTokens.INTERPOLATOR_EXPONENTIAL_EXIT)
                     .setListener(object : AnimatorListenerAdapter() {
                         override fun onAnimationEnd(animation: Animator) {
                             finishDismiss(overlay)
@@ -276,7 +303,7 @@ class VolumeOverlayController(private val context: Context) {
     private fun finishDismiss(overlay: MasterVolumeOverlayView) {
         unregisterVolumeReceiver()
         try {
-            if (currentState.isVisible) {
+            if (overlay.isAttachedToWindow) {
                 windowManager.removeView(overlay)
             }
         } catch (_: Exception) {}
@@ -290,7 +317,10 @@ class VolumeOverlayController(private val context: Context) {
                 val filter = IntentFilter("android.media.VOLUME_CHANGED_ACTION")
                 context.registerReceiver(volumeChangeReceiver, filter)
                 isReceiverRegistered = true
-            } catch (_: Exception) {}
+                Log.d("LiquidVolume", "Registered VOLUME_CHANGED_ACTION receiver")
+            } catch (e: Exception) {
+                Log.w("LiquidVolume", "Failed to register volumeChangeReceiver: ${e.message}")
+            }
         }
     }
 
@@ -298,6 +328,7 @@ class VolumeOverlayController(private val context: Context) {
         if (isReceiverRegistered) {
             try {
                 context.unregisterReceiver(volumeChangeReceiver)
+                Log.d("LiquidVolume", "Unregistered VOLUME_CHANGED_ACTION receiver")
             } catch (_: Exception) {}
             isReceiverRegistered = false
         }

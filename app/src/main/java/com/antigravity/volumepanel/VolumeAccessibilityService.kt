@@ -1,10 +1,19 @@
 package com.antigravity.volumepanel
 
 import android.accessibilityservice.AccessibilityService
-import android.content.Intent
+import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 
+/**
+ * Liquid Volume Accessibility Service
+ *
+ * Responsibilities:
+ * - Intercepts physical KEYCODE_VOLUME_UP and KEYCODE_VOLUME_DOWN events.
+ * - Suppresses the OEM/ColorOS stock volume dialog by consuming both ACTION_DOWN and ACTION_UP.
+ * - Dispatches fluid volume changes to VolumeOverlayController.
+ * - Strict adherence to Google Play Accessibility Policy: No screen inspection, no keystroke logging.
+ */
 class VolumeAccessibilityService : AccessibilityService() {
 
     private lateinit var overlayController: VolumeOverlayController
@@ -13,32 +22,40 @@ class VolumeAccessibilityService : AccessibilityService() {
         super.onCreate()
         overlayController = VolumeOverlayController(this)
         instance = this
+        Log.d("LiquidVolume", "VolumeAccessibilityService created successfully")
     }
 
     override fun onDestroy() {
         super.onDestroy()
         overlayController.dismiss()
         instance = null
+        Log.d("LiquidVolume", "VolumeAccessibilityService destroyed")
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN) {
-            when (event.keyCode) {
-                KeyEvent.KEYCODE_VOLUME_UP -> {
+        when (event.keyCode) {
+            KeyEvent.KEYCODE_VOLUME_UP -> {
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    Log.d("LiquidVolume", "Hardware Key: VOLUME_UP pressed")
                     overlayController.show(direction = 1)
-                    return true // Mutes the stock ColorOS volume panel!
                 }
-                KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                // Return true for BOTH DOWN and UP to fully suppress the default ColorOS dialog
+                return true
+            }
+            KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    Log.d("LiquidVolume", "Hardware Key: VOLUME_DOWN pressed")
                     overlayController.show(direction = -1)
-                    return true // Mutes the stock ColorOS volume panel!
                 }
+                // Return true for BOTH DOWN and UP
+                return true
             }
         }
         return super.onKeyEvent(event)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // No event listening required
+        // No event reading required. Preserves user privacy completely.
     }
 
     override fun onInterrupt() {

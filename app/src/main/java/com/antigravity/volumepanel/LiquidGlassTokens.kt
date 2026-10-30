@@ -14,10 +14,10 @@ import android.view.animation.PathInterpolator
 object LiquidGlassTokens {
 
     // --- Color & Translucency Tokens ---
-    // Pure optical glass: Translucent neutral tints allowing background blur to shine through without color cast
-    const val COLOR_GLASS_BASE = 0x2A141724.toInt() // 16% neutral translucent dark glass
-    const val COLOR_GLASS_CAPSULE = 0x26FFFFFF.toInt() // 15% translucent white frosted capsule
-    const val COLOR_GLASS_CAPSULE_END = 0x12FFFFFF.toInt() // 7% translucent bottom fade
+    // Pure optical glass: Translucent neutral tints allowing background blur to shine through without blue/purple cast
+    const val COLOR_GLASS_BASE = 0x28121214.toInt() // 16% neutral translucent dark glass (Pure obsidian glass)
+    const val COLOR_GLASS_CAPSULE = 0x24FFFFFF.toInt() // 14% translucent white frosted capsule
+    const val COLOR_GLASS_CAPSULE_END = 0x10FFFFFF.toInt() // 6% translucent bottom fade
 
     // Specular Rim / Optical Highlights
     const val COLOR_SPECULAR_HIGH = 0x8AFFFFFF.toInt() // Crisp top reflection
@@ -38,7 +38,7 @@ object LiquidGlassTokens {
     const val COLOR_MODE_RING = 0xFF10B981.toInt() // Emerald Green
 
     // Backdrop Scrim
-    const val COLOR_BACKDROP_SCRIM = 0x48000000.toInt() // 28% neutral dim letting GPU blur glow through
+    const val COLOR_BACKDROP_SCRIM = 0x44000000.toInt() // 27% neutral dim letting GPU blur glow through
 
     // --- Dimensions & Geometry (in dp) ---
     const val DEFAULT_SLIDER_WIDTH_DP = 46
@@ -57,15 +57,16 @@ object LiquidGlassTokens {
     const val MAX_BLUR_RADIUS_PX = 80f
 
     // --- Motion & Physics Tokens ---
-    const val DURATION_COMPACT_ENTER_MS = 250L
-    const val DURATION_COMPACT_EXIT_MS = 200L
+    const val DURATION_COMPACT_ENTER_MS = 240L
+    const val DURATION_COMPACT_EXIT_MS = 180L
     const val DURATION_MASTER_ENTER_MS = 280L
     const val DURATION_MASTER_COLLAPSE_MS = 200L
-    const val DURATION_TOUCH_EXPAND_MS = 150L
-    const val DURATION_VOLUME_ANIM_MS = 140L
+    const val DURATION_TOUCH_EXPAND_MS = 140L
+    const val DURATION_VOLUME_ANIM_MS = 130L
 
-    // Apple fluid spring curves
+    // Apple fluid spring and exit curves
     val INTERPOLATOR_APPLE_SPRING: Interpolator = PathInterpolator(0.22f, 1f, 0.36f, 1f)
+    val INTERPOLATOR_EXPONENTIAL_EXIT: Interpolator = PathInterpolator(0.32f, 0f, 0.67f, 0f) // Accelerates smoothly into bezel
     val INTERPOLATOR_SMOOTH_EXIT: Interpolator = PathInterpolator(0.4f, 0f, 0.2f, 1f)
     val INTERPOLATOR_TOUCH_BOUNCE: Interpolator = OvershootInterpolator(1.4f)
     val INTERPOLATOR_DECELERATE: Interpolator = DecelerateInterpolator(1.8f)
